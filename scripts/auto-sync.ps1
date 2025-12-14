@@ -184,17 +184,26 @@ $diffText
             "Authorization" = "Bearer $DeepSeekApiKey"
         }
         
+        Write-Host "[AI] Calling DeepSeek API..." -ForegroundColor Cyan
         $response = Invoke-RestMethod -Uri "https://api.deepseek.com/chat/completions" -Method Post -Body $body -Headers $headers -ErrorAction Stop
         
         if ($response.choices -and $response.choices.Count -gt 0) {
             $message = $response.choices[0].message.content.Trim()
             # 清理可能的引号
             $message = $message -replace '^["'']|["'']$', ''
-            Write-Host "[AI] DeepSeek generated commit message" -ForegroundColor Cyan
+            Write-Host "[AI] DeepSeek generated: $message" -ForegroundColor Green
             return $message
+        } else {
+            Write-Host "[WARN] DeepSeek API returned empty response" -ForegroundColor Yellow
+            return $null
         }
     } catch {
         Write-Host "[WARN] DeepSeek API failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        if ($_.Exception.Response) {
+            $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+            $responseBody = $reader.ReadToEnd()
+            Write-Host "[WARN] API Error Response: $responseBody" -ForegroundColor Yellow
+        }
         return $null
     }
     
@@ -516,12 +525,21 @@ function Invoke-Sync {
     # AI 生成有意义的 commit message（优先使用 DeepSeek API）
     $msg = $null
     if ($DeepSeekApiKey) {
+        Write-Host "[INFO] DeepSeek API Key detected, using AI to generate commit message..." -ForegroundColor Cyan
         $msg = Generate-CommitMessage-DeepSeek -changedFiles $changedFiles
+        if ($msg) {
+            Write-Host "[INFO] Using AI-generated commit message" -ForegroundColor Green
+        } else {
+            Write-Host "[INFO] DeepSeek API failed or returned empty, falling back to local rules" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "[INFO] No DeepSeek API Key, using local rules to generate commit message" -ForegroundColor Gray
     }
     
     # 如果 DeepSeek 失败或未配置，使用本地规则
     if (-not $msg) {
         $msg = Generate-CommitMessage -changedFiles $changedFiles
+        Write-Host "[INFO] Using local rule-generated commit message" -ForegroundColor Gray
     }
     
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
