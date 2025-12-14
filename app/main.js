@@ -432,7 +432,10 @@ function createWindow() {
         restoring: '正在恢复版本: ',
         restoredTo: '已恢复到版本: ',
         pasteToken: '粘贴 Token',
-        retry: '重试'
+        retry: '重试',
+        loadingHistory: '正在加载历史记录...',
+        noHistoryFound: '未找到历史记录',
+        refreshingHistory: '正在刷新历史记录...'
       },
       en: {
         headline: { ready: 'Ready to Start', syncing: 'Syncing', stopped: 'Stopped' },
@@ -490,7 +493,10 @@ function createWindow() {
         restoring: 'Restoring version: ',
         restoredTo: 'Restored to version: ',
         pasteToken: 'Paste Token',
-        retry: 'Retry'
+        retry: 'Retry',
+        loadingHistory: 'Loading history...',
+        noHistoryFound: 'No history found',
+        refreshingHistory: 'Refreshing history...'
       }
     };
     
@@ -770,7 +776,7 @@ function createWindow() {
       const refreshBtn = $('refresh-history');
       if (refreshBtn) {
         refreshBtn.onclick = () => {
-          addActivity('正在刷新历史记录...', 'watch');
+          addActivity(t('refreshingHistory'), 'watch');
           loadHistory();
         };
       }
@@ -809,17 +815,20 @@ function createWindow() {
       
       try {
         console.log('[loadHistory] Loading history from:', state.projectDir);
-        addActivity('正在加载历史记录...', 'watch');
+        addActivity(t('loadingHistory'), 'watch');
         const history = await ipcRenderer.invoke('get-git-history', state.projectDir);
         console.log('[loadHistory] Received history:', history);
         
         if (history && history.length > 0) {
           renderHistory(history);
-          addActivity(`已加载 ${history.length} 条历史记录`, 'push');
+          const msg = currentLang === 'zh' 
+            ? `已加载 ${history.length} 条历史记录`
+            : `Loaded ${history.length} commit(s)`;
+          addActivity(msg, 'push');
         } else {
           $('history-list').innerHTML = '<div class="history-empty">' + t('noHistory') + '</div>';
           console.log('[loadHistory] No history found');
-          addActivity('未找到历史记录', 'watch');
+          addActivity(t('noHistoryFound'), 'watch');
         }
       } catch (e) {
         console.error('[loadHistory] Failed to load history:', e);
