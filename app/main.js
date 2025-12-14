@@ -828,8 +828,8 @@ function createWindow() {
         if (history && history.length > 0) {
           renderHistory(history);
           const msg = currentLang === 'zh' 
-            ? `已加载 ${history.length} 条历史记录`
-            : `Loaded ${history.length} commit(s)`;
+            ? '已加载 ' + history.length + ' 条历史记录'
+            : 'Loaded ' + history.length + ' commit(s)';
           addActivity(msg, 'push');
         } else {
           $('history-list').innerHTML = '<div class="history-empty">' + t('noHistory') + '</div>';
@@ -839,8 +839,8 @@ function createWindow() {
       } catch (e) {
         console.error('[loadHistory] Failed to load history:', e);
         const errorMsg = currentLang === 'zh' 
-          ? `加载失败: ${e.message}`
-          : `Load failed: ${e.message}`;
+          ? '加载失败: ' + e.message
+          : 'Load failed: ' + e.message;
         $('history-list').innerHTML = '<div class="history-empty">' + errorMsg + '</div>';
         addActivity(t('historyLoadFailed') + ': ' + e.message, 'error');
       }
