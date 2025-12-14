@@ -38,10 +38,12 @@
 - **云端备份** - 所有代码在 GitHub，随时随地访问
 
 ### 🤖 智能工作流
-- **AI 生成 Commit Message** - 深度分析代码变更（新增/删除行数、文件类型），生成有意义的提交信息
-  - 自动识别功能类型：feat/fix/refactor/docs/style/test
-  - 智能分析变更规模：major feature / code cleanup / minor update
-  - 包含统计信息：+50 -20 [2 new, 3 modified]
+- **AI 生成 Commit Message** - 使用 DeepSeek API 深度分析代码变更，生成专业的提交信息
+  - **DeepSeek 集成**：配置 DeepSeek API Key 后，自动分析 git diff，生成符合约定式提交的 commit message
+  - **本地规则备用**：未配置 DeepSeek 时，使用智能本地规则分析
+  - **深度分析**：分析新增/删除行数、文件类型、变更规模
+  - **自动识别**：feat/fix/refactor/docs/style/test/chore
+  - **统计信息**：+50 -20 [2 new, 3 modified]
 - **智能过滤** - 多层过滤无意义提交
   - 自动识别临时文件（.tmp, .log, .cache 等）
   - 检测空白字符变化
@@ -160,6 +162,22 @@ GitHub-AutoSync/
 6. **复制 Token**（格式：`ghp_xxxxxxxxxxxx`）
 
 ⚠️ **重要提示**：Token 只显示一次，请妥善保存！如果丢失，需要重新生成。
+
+## 🤖 配置 DeepSeek API Key（可选，推荐）
+
+配置 DeepSeek API Key 后，工具会使用 AI 分析代码变更，生成更专业的 commit message。
+
+1. 访问 [DeepSeek 开放平台](https://platform.deepseek.com/)
+2. 注册/登录账号
+3. 创建 API Key
+4. 在应用配置界面输入 API Key
+
+**优势：**
+- ✅ 更智能的 commit message（AI 分析代码语义）
+- ✅ 符合约定式提交规范
+- ✅ 自动识别功能类型和变更规模
+
+**不配置也可以使用**：未配置时会使用本地智能规则生成 commit message。
 
 ## 📝 配置文件（可选）
 
