@@ -9,15 +9,22 @@ Write-Host "`n==============================" -ForegroundColor Cyan
 Write-Host "   GitHub AutoSync Service" -ForegroundColor Cyan
 Write-Host "==============================`n" -ForegroundColor Cyan
 
-$projectDir = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
-Set-Location $projectDir
+# 使用当前工作目录（由调用者设置）
+$projectDir = Get-Location
+Write-Host "[INFO] Working in: $projectDir" -ForegroundColor Cyan
 
-# Config
+# Config (在项目目录或用户目录中查找)
 $configPath = Join-Path $projectDir "config.json"
+$userConfigPath = Join-Path $env:USERPROFILE ".autosync-config.json"
 if (Test-Path $configPath) {
     try {
         $config = Get-Content $configPath -Raw | ConvertFrom-Json
         if ($config.github.token -and -not $Token) { $Token = $config.github.token }
+    } catch {}
+} elseif (Test-Path $userConfigPath) {
+    try {
+        $config = Get-Content $userConfigPath -Raw | ConvertFrom-Json
+        if ($config.token -and -not $Token) { $Token = $config.token }
     } catch {}
 }
 
