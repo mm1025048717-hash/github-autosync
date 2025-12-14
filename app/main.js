@@ -1061,14 +1061,27 @@ ipcMain.handle('start-sync', async (event, config) => {
   if (!fs.existsSync(scriptPath)) return { success: false, message: '找不到同步脚本' };
 
   const args = ['-ExecutionPolicy', 'Bypass', '-File', scriptPath];
-  if (config.deepseekApiKey) {
-    args.push('-DeepSeekApiKey', config.deepseekApiKey);
+  if (config.deepseekApiKey && config.deepseekApiKey.trim()) {
+    args.push('-DeepSeekApiKey', config.deepseekApiKey.trim());
+    console.log('[start-sync] Passing DeepSeek API Key via parameter (length:', config.deepseekApiKey.length, ')');
+  } else {
+    console.log('[start-sync] No DeepSeek API Key provided');
+  }
+  
+  const env = { 
+    ...process.env, 
+    GITHUB_TOKEN: config.token || '',
+    DEEPSEEK_API_KEY: (config.deepseekApiKey && config.deepseekApiKey.trim()) || '' 
+  };
+  
+  if (env.DEEPSEEK_API_KEY) {
+    console.log('[start-sync] Setting DEEPSEEK_API_KEY environment variable (length:', env.DEEPSEEK_API_KEY.length, ')');
   }
   
   syncProcess = spawn('powershell', args, {
     cwd: config.projectDir,
     shell: true,
-    env: { ...process.env, GITHUB_TOKEN: config.token, DEEPSEEK_API_KEY: config.deepseekApiKey || '' }
+    env: env
   });
 
   syncProcess.stdout.on('data', d => {
