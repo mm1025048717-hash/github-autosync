@@ -789,17 +789,25 @@ function createWindow() {
     
     // 加载 Git 历史记录
     async function loadHistory() {
-      if (!state.projectDir) return;
+      if (!state.projectDir) {
+        console.log('[loadHistory] No project directory');
+        return;
+      }
       
       try {
+        console.log('[loadHistory] Loading history from:', state.projectDir);
         const history = await ipcRenderer.invoke('get-git-history', state.projectDir);
+        console.log('[loadHistory] Received history:', history);
+        
         if (history && history.length > 0) {
           renderHistory(history);
         } else {
           $('history-list').innerHTML = '<div class="history-empty">' + t('noHistory') + '</div>';
+          console.log('[loadHistory] No history found');
         }
       } catch (e) {
-        console.error('Failed to load history:', e);
+        console.error('[loadHistory] Failed to load history:', e);
+        $('history-list').innerHTML = '<div class="history-empty">加载失败: ' + e.message + '</div>';
       }
     }
     
@@ -1055,36 +1063,64 @@ ipcMain.handle('stop-sync', () => {
 // 获取 Git 历史记录
 ipcMain.handle('get-git-history', async (event, projectDir) => {
   return new Promise((resolve) => {
+    if (!projectDir) {
+      console.error('[get-git-history] No project directory');
+      resolve([]);
+      return;
+    }
+    
     const gitProcess = spawn('git', ['log', '--pretty=format:%H|%s|%ad', '--date=iso', '-20'], {
       cwd: projectDir,
       shell: true
     });
     
     let output = '';
+    let errorOutput = '';
+    
     gitProcess.stdout.on('data', (data) => {
       output += data.toString();
     });
     
+    gitProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+    
     gitProcess.on('close', (code) => {
-      if (code === 0 && output) {
-        const commits = output.trim().split('\n').map(line => {
-          const [hash, ...messageParts] = line.split('|');
-          const message = messageParts.slice(0, -1).join('|');
-          const date = messageParts[messageParts.length - 1];
-          return {
-            hash: hash,
-            message: message || 'No message',
-            date: date || new Date().toISOString()
-          };
-        });
-        resolve(commits);
+      if (code === 0 && output.trim()) {
+        try {
+          const commits = output.trim().split('\n').filter(line => line.trim()).map(line => {
+            const parts = line.split('|');
+            if (parts.length >= 3) {
+              return {
+                hash: parts[0],
+                message: parts.slice(1, -1).join('|') || 'No message',
+                date: parts[parts.length - 1] || new Date().toISOString()
+              };
+            }
+            return null;
+          }).filter(c => c !== null);
+          
+          console.log(`[get-git-history] Loaded ${commits.length} commits`);
+          resolve(commits);
+        } catch (err) {
+          console.error('[get-git-history] Parse error:', err);
+          resolve([]);
+        }
       } else {
+        if (errorOutput) {
+          console.error(`[get-git-history] Git error (code ${code}):`, errorOutput);
+        }
         resolve([]);
       }
     });
     
-    gitProcess.on('error', () => {
+    gitProcess.on('error', (err) => {
+      console.error('[get-git-history] Process error:', err);
       resolve([]);
+    });
+    
+    gitProcess.stderr.on('data', (data) => {
+      console.error('[get-git-history] Git stderr:', data.toString());
     });
   });
 });
