@@ -191,7 +191,8 @@ ipcMain.handle('start-sync', async (event, config) => {
       ...args
     ], {
       cwd: config.projectDir || path.dirname(scriptPath),
-      shell: true
+      shell: true,
+      env: { ...process.env, GITHUB_TOKEN: config.token }
     });
 
     let output = '';
