@@ -6,12 +6,13 @@
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 [![AI Powered](https://img.shields.io/badge/AI-Powered-blue.svg)](https://github.com)
 
-## 🆕 最新更新 (v2.0)
+## 🆕 最新更新 (v3.0)
 
-- 🤖 **AI 智能助手** - 内置本地 AI，引导你完成配置，智能回答问题
-- 🎨 **全新 UI 设计** - 苹果风格蓝白配色，卡片式布局
+- 📊 **实时活动日志** - 界面实时显示同步活动，随时掌握状态
+- 🔔 **Toast 通知** - 推送成功时弹出提示，无需刷新 GitHub
+- 🎯 **极简设计** - Apple 风格，一键启动，减少操作步骤
+- 🔄 **自动检测** - 自动检测 Git、项目目录、Token 配置
 - 📁 **原生目录选择** - 使用系统对话框选择目录，更直观
-- 💬 **智能对话** - AI 自动引导每一步操作，无需查看文档
 
 ## ✨ 项目简介
 
