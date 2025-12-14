@@ -1027,9 +1027,21 @@ ipcMain.handle('start-sync', async (event, config) => {
   syncProcess.stderr.on('data', d => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('sync-log', d.toString());
   });
-  syncProcess.on('close', () => {
+  syncProcess.on('error', (err) => {
+    console.error('Sync process error:', err);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sync-log', `[ERROR] Process error: ${err.message}\n`);
+    }
+  });
+  syncProcess.on('close', (code, signal) => {
+    console.log(`Sync process closed: code=${code}, signal=${signal}`);
     syncProcess = null;
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('sync-stopped');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (code !== 0 && code !== null) {
+        mainWindow.webContents.send('sync-log', `[ERROR] Process exited with code ${code}\n`);
+      }
+      mainWindow.webContents.send('sync-stopped');
+    }
   });
 
   return { success: true };

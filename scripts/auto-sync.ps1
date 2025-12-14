@@ -1,10 +1,27 @@
 ﻿# GitHub AutoSync - Core Script
+# Requires PowerShell 2.0 or higher
+
 param(
     [string]$Token = "",
     [int]$DebounceSeconds = 10,
     [switch]$Background = $false,
     [string]$DeepSeekApiKey = ""
 )
+
+# 错误处理
+$ErrorActionPreference = "Continue"
+$PSDefaultParameterValues['*:Encoding'] = 'utf8'
+
+trap {
+    Write-Host "[ERROR] Script error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[ERROR] Line: $($_.InvocationInfo.ScriptLineNumber)" -ForegroundColor Red
+    Write-Host "[ERROR] Position: $($_.InvocationInfo.PositionMessage)" -ForegroundColor Red
+    Write-Host "[ERROR] Category: $($_.Exception.GetType().FullName)" -ForegroundColor Red
+    if ($_.Exception.InnerException) {
+        Write-Host "[ERROR] Inner: $($_.Exception.InnerException.Message)" -ForegroundColor Red
+    }
+    continue
+}
 
 Write-Host "`n==============================" -ForegroundColor Cyan
 Write-Host "   GitHub AutoSync Service" -ForegroundColor Cyan
@@ -43,10 +60,15 @@ if ($Token) {
 
 # Check git
 try {
-    $null = git --version
-    Write-Host "[OK] Git installed" -ForegroundColor Green
+    $gitVersion = git --version 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] Git not found or not in PATH" -ForegroundColor Red
+        Write-Host "[ERROR] Please install Git: https://git-scm.com/downloads" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "[OK] Git installed: $gitVersion" -ForegroundColor Green
 } catch {
-    Write-Host "[ERROR] Git not found" -ForegroundColor Red
+    Write-Host "[ERROR] Git check failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 
@@ -129,14 +151,14 @@ function Generate-CommitMessage-DeepSeek {
         
         # 构建提示词
         $prompt = @"
-分析以下代码变更，生成一个简洁、有意义的 Git commit message。
+Analyze the following code changes and generate a concise, meaningful Git commit message.
 
-要求：
-1. 使用约定式提交格式（feat/fix/refactor/docs/style/test/chore）
-2. 简洁明了，不超过50字
-3. 只返回 commit message，不要其他说明
+Requirements:
+1. Use conventional commit format (feat/fix/refactor/docs/style/test/chore)
+2. Be concise, no more than 50 characters
+3. Only return the commit message, no other explanations
 
-代码变更：
+Code changes:
 $diffText
 "@
         
@@ -146,7 +168,7 @@ $diffText
             messages = @(
                 @{
                     role = "system"
-                    content = "你是一个专业的 Git commit message 生成助手。只返回 commit message，不要任何解释。"
+                    content = "You are a professional Git commit message generator. Only return the commit message, no explanations."
                 },
                 @{
                     role = "user"
@@ -213,32 +235,45 @@ function Generate-CommitMessage {
             }
         }
         
-        # 判断文件类型
-        if ($ext -in @('.js', '.ts', '.py', '.java', '.cpp', '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt')) {
+        # 判断文件类型（使用兼容性更好的 -contains 替代 -in）
+        $codeExts = @('.js', '.ts', '.py', '.java', '.cpp', '.cs', '.go', '.rs', '.php', '.rb', '.swift', '.kt')
+        $configExts = @('.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.env')
+        $docExts = @('.md', '.txt', '.rst', '.adoc')
+        $styleExts = @('.css', '.scss', '.less', '.sass')
+        $uiExts = @('.html', '.vue', '.jsx', '.tsx', '.svelte')
+        $testExts = @('.test.', '.spec.')
+        
+        if ($codeExts -contains $ext) {
             $hasCode = $true
-            $fileTypes['code'] = ($fileTypes['code'] ?? 0) + 1
+            if (-not $fileTypes['code']) { $fileTypes['code'] = 0 }
+            $fileTypes['code'] = $fileTypes['code'] + 1
             $fileDetails += "代码: $fileName"
         }
-        elseif ($ext -in @('.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.env')) {
+        elseif ($configExts -contains $ext) {
             $hasConfig = $true
-            $fileTypes['config'] = ($fileTypes['config'] ?? 0) + 1
+            if (-not $fileTypes['config']) { $fileTypes['config'] = 0 }
+            $fileTypes['config'] = $fileTypes['config'] + 1
             $fileDetails += "配置: $fileName"
         }
-        elseif ($ext -in @('.md', '.txt', '.rst', '.adoc')) {
+        elseif ($docExts -contains $ext) {
             $hasDoc = $true
-            $fileTypes['doc'] = ($fileTypes['doc'] ?? 0) + 1
+            if (-not $fileTypes['doc']) { $fileTypes['doc'] = 0 }
+            $fileTypes['doc'] = $fileTypes['doc'] + 1
             $fileDetails += "文档: $fileName"
         }
-        elseif ($ext -in @('.css', '.scss', '.less', '.sass')) {
-            $fileTypes['style'] = ($fileTypes['style'] ?? 0) + 1
+        elseif ($styleExts -contains $ext) {
+            if (-not $fileTypes['style']) { $fileTypes['style'] = 0 }
+            $fileTypes['style'] = $fileTypes['style'] + 1
             $fileDetails += "样式: $fileName"
         }
-        elseif ($ext -in @('.html', '.vue', '.jsx', '.tsx', '.svelte')) {
-            $fileTypes['ui'] = ($fileTypes['ui'] ?? 0) + 1
+        elseif ($uiExts -contains $ext) {
+            if (-not $fileTypes['ui']) { $fileTypes['ui'] = 0 }
+            $fileTypes['ui'] = $fileTypes['ui'] + 1
             $fileDetails += "界面: $fileName"
         }
-        elseif ($ext -in @('.test.', '.spec.', '.test.', '.spec.')) {
-            $fileTypes['test'] = ($fileTypes['test'] ?? 0) + 1
+        elseif ($fileName -match '\.(test|spec)\.') {
+            if (-not $fileTypes['test']) { $fileTypes['test'] = 0 }
+            $fileTypes['test'] = $fileTypes['test'] + 1
             $fileDetails += "测试: $fileName"
         }
     }
@@ -410,22 +445,23 @@ function Check-CodeQuality {
         $ext = [System.IO.Path]::GetExtension($file).ToLower()
         
         # 检查常见问题
-        if ($ext -in @('.js', '.ts', '.py')) {
+        $codeFileExts = @('.js', '.ts', '.py')
+        if ($codeFileExts -contains $ext) {
             $content = Get-Content $file -Raw -ErrorAction SilentlyContinue
             if ($content) {
                 # 检查是否有 console.log（调试代码）
                 if ($content -match 'console\.(log|debug|warn|error)') {
-                    $warnings += "$file: contains console statements"
+                    $warnings += "$file contains console statements"
                 }
                 
                 # 检查是否有 TODO/FIXME
                 if ($content -match '(TODO|FIXME|XXX|HACK)') {
-                    $warnings += "$file: contains TODO/FIXME"
+                    $warnings += "$file contains TODO/FIXME"
                 }
                 
                 # 检查是否有硬编码的密码/密钥
-                if ($content -match '(password\s*=\s*["\']|api[_-]?key\s*=\s*["\']|secret\s*=\s*["\'])') {
-                    $warnings += "$file: possible hardcoded credentials"
+                if ($content -match '(password\s*=\s*["'']|api[_-]?key\s*=\s*["'']|secret\s*=\s*["''])') {
+                    $warnings += "$file possible hardcoded credentials"
                 }
             }
         }
