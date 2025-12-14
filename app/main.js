@@ -417,10 +417,41 @@ function createWindow() {
       const text = log.trim();
       if (!text) return;
       let type = 'info';
-      if (text.includes('push') || text.includes('Push')) { type = 'push'; state.commits++; $('stat-commits').textContent = state.commits; showToast('已推送到 GitHub'); }
-      else if (text.includes('commit') || text.includes('Commit')) type = 'push';
-      else if (text.includes('error') || text.includes('Error')) type = 'error';
-      else if (text.includes('watch') || text.includes('Watch')) type = 'watch';
+      
+      // 识别不同类型的日志
+      if (text.includes('[PUSH] Success') || text.includes('Push') && text.includes('Success')) {
+        type = 'push';
+        state.commits++;
+        $('stat-commits').textContent = state.commits;
+        showToast('已推送到 GitHub');
+      }
+      else if (text.includes('[COMMIT]') || text.includes('Commit')) {
+        type = 'push';
+        // 提取 commit message 显示
+        const msgMatch = text.match(/\[COMMIT\]\s*(.+)/);
+        if (msgMatch) {
+          addActivity('提交: ' + msgMatch[1].substring(0, 60), type);
+          return;
+        }
+      }
+      else if (text.includes('[QUALITY]') || text.includes('quality warning')) {
+        type = 'error';
+        addActivity('代码质量检测: ' + text.substring(0, 70), type);
+        return;
+      }
+      else if (text.includes('[WARN]') || text.includes('Conflict') || text.includes('conflict')) {
+        type = 'error';
+      }
+      else if (text.includes('[FILTER]') || text.includes('Skipping')) {
+        type = 'watch';
+      }
+      else if (text.includes('[ERROR]') || text.includes('Error')) {
+        type = 'error';
+      }
+      else if (text.includes('[WATCH]') || text.includes('Watch') || text.includes('Monitoring')) {
+        type = 'watch';
+      }
+      
       addActivity(text.substring(0, 80), type);
     });
     
