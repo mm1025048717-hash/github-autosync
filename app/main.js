@@ -1,11 +1,9 @@
-// ========================================
-// GitHub AutoSync - AI 驱动的智能同步工具
-// ========================================
+// GitHub AutoSync - 极简设计版
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 
 let mainWindow;
 let syncProcess = null;
@@ -14,12 +12,11 @@ app.disableHardwareAcceleration();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1000,
-    height: 700,
-    minWidth: 900,
-    minHeight: 600,
+    width: 520,
+    height: 640,
+    resizable: false,
     frame: true,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#FFFFFF',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -27,364 +24,564 @@ function createWindow() {
     },
     show: true,
     center: true,
-    title: 'GitHub AutoSync'
+    title: 'AutoSync'
   });
 
   const html = `
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>GitHub AutoSync</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    :root {
-      --blue: #007AFF;
-      --blue-light: #E3F2FD;
-      --bg: #F5F5F7;
-      --white: #FFFFFF;
-      --gray-100: #F5F5F7;
-      --gray-200: #E8E8ED;
-      --gray-300: #D2D2D7;
-      --gray-500: #86868B;
-      --gray-700: #424245;
-      --gray-900: #1D1D1F;
-      --green: #34C759;
-      --red: #FF3B30;
+    
+    @font-face {
+      font-family: 'SF Pro';
+      src: local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI');
     }
+    
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', sans-serif;
-      background: var(--bg);
-      color: var(--gray-900);
-      line-height: 1.5;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      background: #FFFFFF;
+      color: #1D1D1F;
+      line-height: 1.47059;
+      font-weight: 400;
+      letter-spacing: -0.022em;
+      -webkit-font-smoothing: antialiased;
     }
-    .app { display: flex; height: 100vh; }
     
-    .main-panel { flex: 1; display: flex; flex-direction: column; padding: 32px; overflow-y: auto; }
+    .container {
+      padding: 48px 40px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
     
-    .header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
-    .logo { width: 48px; height: 48px; background: var(--blue); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-    .title { font-size: 24px; font-weight: 600; }
-    .subtitle { font-size: 14px; color: var(--gray-500); }
+    .brand {
+      font-size: 13px;
+      font-weight: 600;
+      color: #86868B;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
     
-    .steps { display: flex; flex-direction: column; gap: 16px; }
-    .step-card { background: var(--white); border-radius: 16px; padding: 24px; display: flex; align-items: flex-start; gap: 16px; border: 2px solid transparent; }
-    .step-card.active { border-color: var(--blue); }
-    .step-card.completed { opacity: 0.6; }
-    .step-number { width: 32px; height: 32px; background: var(--gray-200); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; }
-    .step-card.active .step-number { background: var(--blue); color: white; }
-    .step-card.completed .step-number { background: var(--green); color: white; }
-    .step-content { flex: 1; }
-    .step-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-    .step-desc { font-size: 14px; color: var(--gray-500); margin-bottom: 12px; }
-    .step-input { width: 100%; padding: 12px 16px; border: 1px solid var(--gray-300); border-radius: 10px; font-size: 14px; margin-bottom: 12px; }
-    .step-input:focus { outline: none; border-color: var(--blue); }
-    .step-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .headline {
+      font-size: 32px;
+      font-weight: 600;
+      line-height: 1.125;
+      letter-spacing: -0.003em;
+      margin-bottom: 12px;
+    }
     
-    .btn { padding: 10px 20px; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
-    .btn-primary { background: var(--blue); color: white; }
-    .btn-secondary { background: var(--gray-200); color: var(--gray-700); }
-    .btn-success { background: var(--green); color: white; }
-    .btn-danger { background: var(--red); color: white; }
+    .subhead {
+      font-size: 17px;
+      color: #86868B;
+      margin-bottom: 40px;
+    }
     
-    .status-panel { margin-top: 24px; background: var(--white); border-radius: 16px; padding: 24px; }
-    .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-    .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 13px; }
-    .status-badge.running { background: rgba(52,199,89,0.15); color: var(--green); }
-    .status-badge.stopped { background: var(--gray-200); color: var(--gray-500); }
-    .status-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .stat-item { text-align: center; }
-    .stat-value { font-size: 28px; font-weight: 600; color: var(--blue); }
-    .stat-label { font-size: 12px; color: var(--gray-500); }
+    .status-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 40px 0;
+    }
     
-    .ai-panel { width: 360px; background: var(--white); border-left: 1px solid var(--gray-200); display: flex; flex-direction: column; }
-    .ai-header { padding: 20px; border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; gap: 12px; }
-    .ai-avatar { width: 40px; height: 40px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-    .ai-name { font-weight: 600; }
-    .ai-status { font-size: 12px; color: var(--green); }
+    .status-indicator {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #F5F5F7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
     
-    .ai-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-    .ai-message { display: flex; gap: 12px; animation: fadeIn 0.3s; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .ai-msg-avatar { width: 32px; height: 32px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
-    .ai-msg-content { background: var(--blue-light); padding: 12px 16px; border-radius: 16px; border-top-left-radius: 4px; font-size: 14px; line-height: 1.6; max-width: 280px; }
-    .ai-msg-content.user-msg { background: var(--blue); color: white; border-radius: 16px; border-top-right-radius: 4px; }
-    .ai-msg-content.thinking { background: var(--gray-100); color: var(--gray-500); }
+    .status-indicator.active {
+      background: #34C759;
+    }
     
-    .ai-suggestions { padding: 16px 20px; border-top: 1px solid var(--gray-200); }
-    .ai-suggestions-title { font-size: 12px; color: var(--gray-500); margin-bottom: 12px; }
-    .ai-suggestion-btns { display: flex; flex-wrap: wrap; gap: 8px; }
-    .suggestion-btn { padding: 8px 14px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 20px; font-size: 13px; cursor: pointer; }
-    .suggestion-btn:hover { background: var(--blue); color: white; border-color: var(--blue); }
+    .status-indicator.active::after {
+      content: '';
+      width: 24px;
+      height: 24px;
+      background: white;
+      border-radius: 50%;
+    }
     
-    .ai-input-area { padding: 16px 20px; border-top: 1px solid var(--gray-200); display: flex; gap: 12px; }
-    .ai-input { flex: 1; padding: 12px 16px; border: 1px solid var(--gray-300); border-radius: 24px; font-size: 14px; }
-    .ai-input:focus { outline: none; border-color: var(--blue); }
-    .ai-send { width: 44px; height: 44px; background: var(--blue); border: none; border-radius: 50%; color: white; font-size: 18px; cursor: pointer; }
+    .status-indicator.loading {
+      background: conic-gradient(#007AFF 0deg, #F5F5F7 60deg);
+      animation: rotate 1s linear infinite;
+    }
     
-    .typing-indicator { display: flex; gap: 4px; }
-    .typing-indicator span { width: 6px; height: 6px; background: var(--gray-400); border-radius: 50%; animation: bounce 1.4s infinite; }
-    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
+    @keyframes rotate {
+      to { transform: rotate(360deg); }
+    }
+    
+    .status-text {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .status-detail {
+      font-size: 15px;
+      color: #86868B;
+      max-width: 280px;
+    }
+    
+    .ai-message {
+      background: #F5F5F7;
+      border-radius: 18px;
+      padding: 16px 20px;
+      margin-top: 32px;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #1D1D1F;
+      max-width: 360px;
+      text-align: left;
+      animation: fadeUp 0.4s ease;
+    }
+    
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .action-area {
+      padding-top: 32px;
+    }
+    
+    .btn-primary {
+      width: 100%;
+      padding: 17px 24px;
+      font-size: 17px;
+      font-weight: 500;
+      background: #007AFF;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary:hover {
+      background: #0066D6;
+      transform: scale(0.98);
+    }
+    
+    .btn-primary:disabled {
+      background: #D2D2D7;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .btn-secondary {
+      width: 100%;
+      padding: 17px 24px;
+      font-size: 17px;
+      font-weight: 500;
+      background: transparent;
+      color: #007AFF;
+      border: none;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    
+    .btn-secondary:hover {
+      color: #0066D6;
+    }
+    
+    .input-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    
+    .input-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #86868B;
+      margin-bottom: 8px;
+      display: block;
+    }
+    
+    .input-field {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 17px;
+      border: 1px solid #D2D2D7;
+      border-radius: 10px;
+      background: #FFFFFF;
+      transition: border-color 0.2s;
+    }
+    
+    .input-field:focus {
+      outline: none;
+      border-color: #007AFF;
+    }
+    
+    .input-field::placeholder {
+      color: #C7C7CC;
+    }
+    
+    .stats-row {
+      display: flex;
+      justify-content: center;
+      gap: 48px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #F5F5F7;
+    }
+    
+    .stat {
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 28px;
+      font-weight: 600;
+      color: #1D1D1F;
+    }
+    
+    .stat-label {
+      font-size: 13px;
+      color: #86868B;
+      margin-top: 4px;
+    }
+    
+    .hidden { display: none !important; }
+    
+    .link {
+      color: #007AFF;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    
+    .link:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="main-panel">
-      <div class="header">
-        <div class="logo">🔄</div>
-        <div>
-          <div class="title">GitHub AutoSync</div>
-          <div class="subtitle">AI 驱动的智能代码同步</div>
-        </div>
-      </div>
-      
-      <div class="steps">
-        <div class="step-card active" id="step-1">
-          <div class="step-number">1</div>
-          <div class="step-content">
-            <div class="step-title">选择项目目录</div>
-            <div class="step-desc">选择你要同步的代码项目文件夹</div>
-            <div class="step-actions">
-              <input type="text" class="step-input" id="project-dir" placeholder="点击浏览选择目录..." readonly style="flex:1;">
-              <button class="btn btn-primary" onclick="selectDirectory()">📁 浏览</button>
-            </div>
-          </div>
-        </div>
-        
-        <div class="step-card" id="step-2">
-          <div class="step-number">2</div>
-          <div class="step-content">
-            <div class="step-title">配置 GitHub Token</div>
-            <div class="step-desc">用于认证 GitHub 账户</div>
-            <input type="password" class="step-input" id="github-token" placeholder="粘贴你的 GitHub Token...">
-            <div class="step-actions">
-              <button class="btn btn-secondary" onclick="openTokenPage()">🔑 获取 Token</button>
-              <button class="btn btn-primary" onclick="validateToken()">验证</button>
-            </div>
-          </div>
-        </div>
-        
-        <div class="step-card" id="step-3">
-          <div class="step-number">3</div>
-          <div class="step-content">
-            <div class="step-title">启动自动同步</div>
-            <div class="step-desc">开启后自动同步到 GitHub</div>
-            <div class="step-actions">
-              <button class="btn btn-success" id="start-btn" onclick="startSync()">▶️ 启动同步</button>
-              <button class="btn btn-danger" id="stop-btn" onclick="stopSync()" style="display:none;">⏹️ 停止</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="status-panel" id="status-panel" style="display:none;">
-        <div class="status-header">
-          <div style="font-weight:600;">同步状态</div>
-          <div class="status-badge running" id="sync-badge">● 运行中</div>
-        </div>
-        <div class="status-stats">
-          <div class="stat-item"><div class="stat-value" id="stat-commits">0</div><div class="stat-label">今日提交</div></div>
-          <div class="stat-item"><div class="stat-value" id="stat-files">0</div><div class="stat-label">监听文件</div></div>
-          <div class="stat-item"><div class="stat-value" id="stat-time">0分</div><div class="stat-label">运行时间</div></div>
-        </div>
-      </div>
+  <div class="container">
+    <div class="brand">AutoSync</div>
+    <h1 class="headline" id="headline">准备开始</h1>
+    <p class="subhead" id="subhead">自动同步你的代码到 GitHub</p>
+    
+    <div class="status-area" id="status-area">
+      <div class="status-indicator" id="indicator"></div>
+      <div class="status-text" id="status-text">正在检测环境</div>
+      <div class="status-detail" id="status-detail">请稍候，AI 正在分析你的开发环境</div>
+      <div class="ai-message hidden" id="ai-message"></div>
     </div>
     
-    <div class="ai-panel">
-      <div class="ai-header">
-        <div class="ai-avatar">🤖</div>
-        <div><div class="ai-name">AI 助手</div><div class="ai-status">● 本地模式</div></div>
+    <div class="action-area" id="action-area">
+      <div class="input-group hidden" id="token-group">
+        <label class="input-label">GitHub Token</label>
+        <input type="password" class="input-field" id="token-input" placeholder="粘贴你的 Token">
       </div>
-      <div class="ai-messages" id="ai-messages"></div>
-      <div class="ai-suggestions">
-        <div class="ai-suggestions-title">快捷操作</div>
-        <div class="ai-suggestion-btns">
-          <button class="suggestion-btn" onclick="aiAction('help')">🆘 帮助</button>
-          <button class="suggestion-btn" onclick="aiAction('commit')">📝 生成提交</button>
-          <button class="suggestion-btn" onclick="aiAction('status')">📊 状态</button>
-        </div>
-      </div>
-      <div class="ai-input-area">
-        <input type="text" class="ai-input" id="ai-input" placeholder="问我任何问题..." onkeypress="if(event.key==='Enter')sendToAI()">
-        <button class="ai-send" onclick="sendToAI()">➤</button>
-      </div>
+      <button class="btn-primary" id="main-btn" disabled>检测中</button>
+      <button class="btn-secondary hidden" id="secondary-btn">获取 Token</button>
     </div>
   </div>
-  
+
   <script>
     const { ipcRenderer, shell } = require('electron');
     
-    let appState = { step: 1, projectDir: '', token: '', isRunning: false, commits: 0, startTime: null };
-    
-    // 初始化
-    window.onload = function() {
-      setTimeout(() => {
-        addAIMessage('👋 你好！我是你的 AI 助手。');
-        setTimeout(() => addAIMessage('我会引导你完成设置。首先，请点击 <b>浏览</b> 选择项目目录。'), 800);
-      }, 500);
+    const state = {
+      phase: 'init', // init, need-token, ready, running
+      projectDir: '',
+      token: '',
+      commits: 0,
+      startTime: null
     };
     
-    function addAIMessage(text) {
-      const container = document.getElementById('ai-messages');
-      const div = document.createElement('div');
-      div.className = 'ai-message';
-      div.innerHTML = '<div class="ai-msg-avatar">🤖</div><div class="ai-msg-content">' + text + '</div>';
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
+    const $ = id => document.getElementById(id);
+    
+    // 启动时自动检测
+    window.onload = async () => {
+      await autoDetect();
+    };
+    
+    async function autoDetect() {
+      showLoading('正在检测', '分析开发环境中');
+      
+      // 1. 检测 Git
+      await delay(500);
+      const hasGit = await checkGit();
+      if (!hasGit) {
+        showError('未安装 Git', '请先安装 Git 后重试');
+        return;
+      }
+      
+      // 2. 尝试自动获取项目目录（从 Cursor 工作区或当前目录）
+      await delay(300);
+      state.projectDir = await detectProject();
+      
+      if (!state.projectDir) {
+        // 需要用户选择
+        showMessage('点击下方按钮选择你的项目文件夹');
+        setButton('选择项目', selectProject);
+        return;
+      }
+      
+      // 3. 检测是否有 Token
+      await delay(300);
+      state.token = await loadToken();
+      
+      if (!state.token) {
+        showNeedToken();
+        return;
+      }
+      
+      // 4. 一切就绪
+      showReady();
     }
     
-    function addUserMessage(text) {
-      const container = document.getElementById('ai-messages');
-      const div = document.createElement('div');
-      div.className = 'ai-message';
-      div.style.flexDirection = 'row-reverse';
-      div.innerHTML = '<div class="ai-msg-avatar" style="background:#D2D2D7;">👤</div><div class="ai-msg-content user-msg">' + text + '</div>';
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
-    }
-    
-    function updateStep(step) {
-      appState.step = step;
-      document.querySelectorAll('.step-card').forEach((card, i) => {
-        card.classList.remove('active', 'completed');
-        if (i + 1 < step) card.classList.add('completed');
-        if (i + 1 === step) card.classList.add('active');
+    async function checkGit() {
+      return new Promise(resolve => {
+        require('child_process').exec('git --version', (err) => {
+          resolve(!err);
+        });
       });
     }
     
-    // 使用 Electron 对话框选择目录
-    async function selectDirectory() {
-      try {
-        const dir = await ipcRenderer.invoke('select-directory');
-        if (dir) {
-          appState.projectDir = dir;
-          document.getElementById('project-dir').value = dir;
-          updateStep(2);
-          addAIMessage('✅ 项目目录已设置：<b>' + dir + '</b>');
-          addAIMessage('现在请配置你的 <b>GitHub Token</b>。点击"获取 Token"我会教你怎么做。');
+    async function detectProject() {
+      // 尝试从多个来源检测项目
+      const cwd = process.cwd();
+      const home = require('os').homedir();
+      
+      // 检查常见位置
+      const possiblePaths = [
+        cwd,
+        require('path').join(home, 'Desktop'),
+        require('path').join(home, 'Projects'),
+        require('path').join(home, 'Documents')
+      ];
+      
+      for (const p of possiblePaths) {
+        if (await isGitRepo(p)) {
+          return p;
         }
-      } catch (err) {
-        addAIMessage('❌ 选择目录失败：' + err.message);
+      }
+      
+      return null;
+    }
+    
+    async function isGitRepo(dir) {
+      return new Promise(resolve => {
+        require('child_process').exec('git rev-parse --git-dir', { cwd: dir }, (err) => {
+          resolve(!err);
+        });
+      });
+    }
+    
+    async function loadToken() {
+      try {
+        const configPath = require('path').join(require('os').homedir(), '.autosync-token');
+        if (require('fs').existsSync(configPath)) {
+          return require('fs').readFileSync(configPath, 'utf8').trim();
+        }
+      } catch (e) {}
+      return null;
+    }
+    
+    async function saveToken(token) {
+      try {
+        const configPath = require('path').join(require('os').homedir(), '.autosync-token');
+        require('fs').writeFileSync(configPath, token, 'utf8');
+      } catch (e) {}
+    }
+    
+    async function selectProject() {
+      const dir = await ipcRenderer.invoke('select-directory');
+      if (dir) {
+        state.projectDir = dir;
+        showMessage('项目目录：' + shortenPath(dir));
+        await delay(500);
+        
+        state.token = await loadToken();
+        if (!state.token) {
+          showNeedToken();
+        } else {
+          showReady();
+        }
       }
     }
     
-    function openTokenPage() {
-      shell.openExternal('https://github.com/settings/tokens/new?description=AutoSync&scopes=repo');
-      addAIMessage('🔑 已打开 GitHub Token 页面。请按步骤操作：<br>1. 给 Token 起个名字<br>2. 勾选 <b>repo</b> 权限<br>3. 点击 Generate token<br>4. 复制 Token 粘贴到左边');
+    function showNeedToken() {
+      state.phase = 'need-token';
+      $('headline').textContent = '需要授权';
+      $('subhead').textContent = '连接你的 GitHub 账户';
+      
+      $('indicator').className = 'status-indicator';
+      $('status-text').textContent = '输入 Token';
+      $('status-detail').textContent = '用于安全地推送代码到 GitHub';
+      
+      $('token-group').classList.remove('hidden');
+      $('secondary-btn').classList.remove('hidden');
+      
+      setButton('继续', validateAndSaveToken);
+      $('secondary-btn').onclick = () => {
+        shell.openExternal('https://github.com/settings/tokens/new?description=AutoSync&scopes=repo');
+        showMessage('在 GitHub 页面生成 Token 后，粘贴到上方输入框');
+      };
     }
     
-    function validateToken() {
-      const token = document.getElementById('github-token').value;
-      if (!token || token.length < 10) {
-        addAIMessage('⚠️ Token 格式不对，请完整粘贴（以 ghp_ 开头）。');
+    async function validateAndSaveToken() {
+      const token = $('token-input').value.trim();
+      if (!token || token.length < 20) {
+        showMessage('请输入有效的 Token');
         return;
       }
-      appState.token = token;
-      updateStep(3);
-      addAIMessage('✅ Token 验证成功！现在点击 <b>启动同步</b> 开始自动同步吧！');
+      
+      state.token = token;
+      await saveToken(token);
+      
+      $('token-group').classList.add('hidden');
+      $('secondary-btn').classList.add('hidden');
+      
+      showReady();
+    }
+    
+    function showReady() {
+      state.phase = 'ready';
+      $('headline').textContent = '准备就绪';
+      $('subhead').textContent = shortenPath(state.projectDir);
+      
+      $('indicator').className = 'status-indicator';
+      $('status-text').textContent = '一键启动';
+      $('status-detail').textContent = '文件保存后自动同步到 GitHub';
+      
+      hideMessage();
+      setButton('开始同步', startSync);
     }
     
     async function startSync() {
-      appState.isRunning = true;
-      appState.startTime = Date.now();
-      document.getElementById('start-btn').style.display = 'none';
-      document.getElementById('stop-btn').style.display = 'inline-flex';
-      document.getElementById('status-panel').style.display = 'block';
+      state.phase = 'running';
+      state.startTime = Date.now();
       
-      addAIMessage('🚀 同步服务已启动！我会自动：<br>• 监听文件变化<br>• 智能生成 commit 信息<br>• 自动推送到 GitHub');
+      $('headline').textContent = '同步中';
+      $('subhead').textContent = '实时监听文件变化';
       
-      // 调用后端启动同步
+      $('indicator').className = 'status-indicator active';
+      $('status-text').textContent = '运行中';
+      $('status-detail').textContent = '修改代码后会自动提交并推送';
+      
+      showStats();
+      setButton('停止', stopSync);
+      $('main-btn').style.background = '#FF3B30';
+      
+      // 调用后端启动
       try {
-        const result = await ipcRenderer.invoke('start-sync', {
-          projectDir: appState.projectDir,
-          token: appState.token,
-          debounceSeconds: 10
+        await ipcRenderer.invoke('start-sync', {
+          projectDir: state.projectDir,
+          token: state.token
         });
-        if (!result.success) {
-          addAIMessage('⚠️ ' + result.message);
-        }
-      } catch (err) {
-        addAIMessage('⚠️ 启动失败：' + err.message);
+      } catch (e) {
+        showMessage('启动失败：' + e.message);
       }
       
-      setInterval(updateStats, 5000);
+      // 定时更新统计
+      updateStatsInterval = setInterval(updateStats, 1000);
     }
     
+    let updateStatsInterval;
+    
     async function stopSync() {
-      appState.isRunning = false;
-      document.getElementById('start-btn').style.display = 'inline-flex';
-      document.getElementById('stop-btn').style.display = 'none';
-      document.getElementById('sync-badge').className = 'status-badge stopped';
-      document.getElementById('sync-badge').textContent = '● 已停止';
-      
+      clearInterval(updateStatsInterval);
       await ipcRenderer.invoke('stop-sync');
-      addAIMessage('⏹️ 同步已停止。需要时随时可以重新启动。');
+      
+      $('main-btn').style.background = '#007AFF';
+      hideStats();
+      showReady();
+    }
+    
+    function showStats() {
+      let statsDiv = $('stats-div');
+      if (!statsDiv) {
+        statsDiv = document.createElement('div');
+        statsDiv.id = 'stats-div';
+        statsDiv.className = 'stats-row';
+        statsDiv.innerHTML = \`
+          <div class="stat"><div class="stat-value" id="stat-commits">0</div><div class="stat-label">提交</div></div>
+          <div class="stat"><div class="stat-value" id="stat-time">0:00</div><div class="stat-label">运行时长</div></div>
+        \`;
+        $('status-area').appendChild(statsDiv);
+      }
+      statsDiv.classList.remove('hidden');
+    }
+    
+    function hideStats() {
+      const statsDiv = $('stats-div');
+      if (statsDiv) statsDiv.classList.add('hidden');
     }
     
     function updateStats() {
-      if (!appState.isRunning) return;
-      const mins = Math.floor((Date.now() - appState.startTime) / 60000);
-      document.getElementById('stat-time').textContent = mins + '分';
-      document.getElementById('stat-files').textContent = Math.floor(Math.random() * 50) + 10;
+      if (!state.startTime) return;
+      const secs = Math.floor((Date.now() - state.startTime) / 1000);
+      const mins = Math.floor(secs / 60);
+      const s = secs % 60;
+      $('stat-time').textContent = mins + ':' + (s < 10 ? '0' : '') + s;
+      $('stat-commits').textContent = state.commits;
     }
     
-    // AI 本地响应（不依赖网络）
-    function aiAction(action) {
-      if (action === 'help') {
-        addAIMessage('📚 <b>功能说明：</b><br><br>• <b>自动同步</b> - 文件保存后自动 commit 并 push<br>• <b>智能防抖</b> - 避免频繁提交（默认10秒）<br>• <b>安全认证</b> - 使用 GitHub Token<br><br>有问题随时问我！');
-      } else if (action === 'commit') {
-        const commits = ['feat: 添加新功能', 'fix: 修复问题', 'docs: 更新文档', 'style: 优化样式', 'refactor: 重构代码'];
-        const random = commits[Math.floor(Math.random() * commits.length)];
-        addAIMessage('📝 建议的 commit 信息：<br><code>' + random + '</code>');
-      } else if (action === 'status') {
-        const status = appState.isRunning ? '运行中 ✅' : '未启动 ⚪';
-        const dir = appState.projectDir || '未设置';
-        addAIMessage('📊 <b>当前状态：</b><br>• 服务：' + status + '<br>• 目录：' + dir + '<br>• 提交：' + appState.commits + ' 次');
+    // UI Helpers
+    function showLoading(title, detail) {
+      $('indicator').className = 'status-indicator loading';
+      $('status-text').textContent = title;
+      $('status-detail').textContent = detail;
+      $('main-btn').disabled = true;
+      $('main-btn').textContent = '检测中';
+    }
+    
+    function showError(title, detail) {
+      $('indicator').className = 'status-indicator';
+      $('indicator').style.background = '#FF3B30';
+      $('status-text').textContent = title;
+      $('status-detail').textContent = detail;
+      setButton('重试', autoDetect);
+    }
+    
+    function showMessage(text) {
+      $('ai-message').textContent = text;
+      $('ai-message').classList.remove('hidden');
+    }
+    
+    function hideMessage() {
+      $('ai-message').classList.add('hidden');
+    }
+    
+    function setButton(text, onClick) {
+      const btn = $('main-btn');
+      btn.disabled = false;
+      btn.textContent = text;
+      btn.onclick = onClick;
+    }
+    
+    function shortenPath(p) {
+      if (!p) return '';
+      const parts = p.split(/[\\\\/]/);
+      if (parts.length > 3) {
+        return '...' + require('path').sep + parts.slice(-2).join(require('path').sep);
       }
+      return p;
     }
     
-    // 本地 AI 回复（不调用外部 API）
-    function sendToAI() {
-      const input = document.getElementById('ai-input');
-      const text = input.value.trim();
-      if (!text) return;
-      
-      input.value = '';
-      addUserMessage(text);
-      
-      // 本地智能回复
-      setTimeout(() => {
-        let reply = '';
-        const lowerText = text.toLowerCase();
-        
-        if (lowerText.includes('帮助') || lowerText.includes('help')) {
-          reply = '📚 我可以帮你：<br>• 配置自动同步<br>• 生成 commit 信息<br>• 解答 Git 问题<br><br>试试点击快捷操作按钮！';
-        } else if (lowerText.includes('commit') || lowerText.includes('提交')) {
-          reply = '📝 根据你的改动，建议使用：<br><code>feat: 更新项目功能</code>';
-        } else if (lowerText.includes('git') || lowerText.includes('命令')) {
-          reply = '💡 <b>常用 Git 命令：</b><br>• git status - 查看状态<br>• git add . - 添加所有文件<br>• git commit -m "" - 提交<br>• git push - 推送';
-        } else if (lowerText.includes('冲突') || lowerText.includes('conflict')) {
-          reply = '🔧 <b>解决冲突步骤：</b><br>1. git pull 拉取最新代码<br>2. 手动编辑冲突文件<br>3. git add . 添加修改<br>4. git commit 提交';
-        } else if (lowerText.includes('token')) {
-          reply = '🔑 获取 Token：<br>1. 访问 github.com/settings/tokens<br>2. 点击 Generate new token<br>3. 勾选 repo 权限<br>4. 复制并保存';
-        } else if (lowerText.includes('你好') || lowerText.includes('hi') || lowerText.includes('hello')) {
-          reply = '👋 你好！有什么可以帮你的吗？';
-        } else {
-          reply = '🤔 我理解你的问题了。关于 "' + text + '"，你可以：<br>• 查看文档了解更多<br>• 点击快捷按钮获取帮助<br>• 直接问我具体问题';
-        }
-        
-        addAIMessage(reply);
-      }, 300);
+    function delay(ms) {
+      return new Promise(r => setTimeout(r, ms));
     }
     
     // 监听同步日志
     ipcRenderer.on('sync-log', (event, log) => {
-      if (log.includes('commit') || log.includes('push')) {
-        appState.commits++;
-        document.getElementById('stat-commits').textContent = appState.commits;
-        addAIMessage('📦 已自动提交：<code>' + log.trim().substring(0, 50) + '</code>');
+      if (log.includes('push') || log.includes('commit')) {
+        state.commits++;
+        updateStats();
       }
     });
   </script>
@@ -400,57 +597,43 @@ function createWindow() {
 ipcMain.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
-    title: '选择项目目录'
+    title: '选择项目'
   });
-  if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0];
-  }
-  return null;
+  return result.canceled ? null : result.filePaths[0];
 });
 
 ipcMain.handle('start-sync', async (event, config) => {
-  if (syncProcess) return { success: false, message: '同步服务已在运行' };
-
+  if (syncProcess) return { success: false };
+  
   let scriptPath = path.join(__dirname, '..', 'scripts', 'auto-sync.ps1');
   if (!fs.existsSync(scriptPath)) {
     scriptPath = path.join(__dirname, '..', 'auto-sync.ps1');
   }
   
   if (!fs.existsSync(scriptPath)) {
-    return { success: false, message: '找不到 auto-sync.ps1 脚本' };
+    return { success: false, message: 'Script not found' };
   }
 
-  return new Promise((resolve) => {
-    syncProcess = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
-      cwd: config.projectDir || path.dirname(scriptPath),
-      shell: true
-    });
-
-    syncProcess.stdout.on('data', (data) => {
-      mainWindow.webContents.send('sync-log', data.toString());
-    });
-
-    syncProcess.on('close', () => {
-      syncProcess = null;
-      mainWindow.webContents.send('sync-stopped');
-    });
-
-    setTimeout(() => {
-      resolve(syncProcess ? { success: true } : { success: false, message: '启动失败' });
-    }, 1000);
+  syncProcess = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
+    cwd: config.projectDir,
+    shell: true,
+    env: { ...process.env, GITHUB_TOKEN: config.token }
   });
+
+  syncProcess.stdout.on('data', d => mainWindow?.webContents.send('sync-log', d.toString()));
+  syncProcess.stderr.on('data', d => mainWindow?.webContents.send('sync-log', d.toString()));
+  syncProcess.on('close', () => { syncProcess = null; });
+
+  return { success: true };
 });
 
-ipcMain.handle('stop-sync', async () => {
+ipcMain.handle('stop-sync', () => {
   if (syncProcess) {
     syncProcess.kill();
     syncProcess = null;
-    return { success: true };
   }
-  return { success: false };
+  return { success: true };
 });
 
 app.whenReady().then(createWindow);
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+app.on('window-all-closed', () => app.quit());
