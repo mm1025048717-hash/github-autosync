@@ -51,6 +51,14 @@ if (Test-Path $configPath) {
 # 从环境变量读取 DeepSeek API Key
 if (-not $DeepSeekApiKey) { $DeepSeekApiKey = $env:DEEPSEEK_API_KEY }
 
+# 显示 DeepSeek API Key 状态（不显示完整 key）
+if ($DeepSeekApiKey) {
+    $keyPreview = $DeepSeekApiKey.Substring(0, [Math]::Min(10, $DeepSeekApiKey.Length)) + "..."
+    Write-Host "[INFO] DeepSeek API Key configured: $keyPreview" -ForegroundColor Green
+} else {
+    Write-Host "[INFO] No DeepSeek API Key configured, will use local rules" -ForegroundColor Yellow
+}
+
 # Token from env
 if (-not $Token) { $Token = $env:GITHUB_TOKEN }
 if ($Token) {
