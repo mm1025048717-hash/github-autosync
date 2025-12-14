@@ -788,6 +788,13 @@ function createWindow() {
       }
       
       try {
+        // 调试：检查 API Key 是否已加载
+        if (state.deepseekApiKey) {
+          addActivity('DeepSeek API Key 已配置，长度: ' + state.deepseekApiKey.length, 'watch');
+        } else {
+          addActivity('未配置 DeepSeek API Key，将使用本地规则', 'watch');
+        }
+        
         const result = await ipcRenderer.invoke('start-sync', { 
           projectDir: state.projectDir, 
           token: state.token,
