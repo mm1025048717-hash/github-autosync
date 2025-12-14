@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub AutoSync</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 自定义标题栏 -->
+    <div class="titlebar">
+        <div class="titlebar-drag-region">
+            <div class="titlebar-title">🔄 GitHub AutoSync</div>
+            <div class="titlebar-controls">
+                <button class="titlebar-button minimize" id="minimize-btn">−</button>
+                <button class="titlebar-button maximize" id="maximize-btn">□</button>
+                <button class="titlebar-button close" id="close-btn">×</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 侧边栏导航 -->
+        <div class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🔄</div>
+                <div class="logo-text">AutoSync</div>
+            </div>
+            <nav class="nav-menu">
+                <button class="nav-item active" data-page="home">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-text">首页</span>
+                </button>
+                <button class="nav-item" data-page="setup">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">配置</span>
+                </button>
+                <button class="nav-item" data-page="status">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">状态</span>
+                </button>
+                <button class="nav-item" data-page="logs">
+                    <span class="nav-icon">📝</span>
+                    <span class="nav-text">日志</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <!-- 首页 -->
+            <div class="page active" id="page-home">
+                <div class="welcome-card">
+                    <h1>欢迎使用 GitHub AutoSync</h1>
+                    <p class="subtitle">一边聊天，一边自动同步到 GitHub</p>
+                    
+                    <div class="status-indicator" id="sync-status">
+                        <div class="status-dot"></div>
+                        <span class="status-text">未启动</span>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" id="start-btn">
+                            <span>▶️</span> 启动自动同步
+                        </button>
+                        <button class="btn btn-secondary" id="stop-btn" disabled>
+                            <span>⏹️</span> 停止同步
+                        </button>
+                    </div>
+
+                    <div class="quick-stats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="sync-count">0</div>
+                            <div class="stat-label">同步次数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="file-count">0</div>
+                            <div class="stat-label">监听文件</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="last-sync">--</div>
+                            <div class="stat-label">最后同步</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-cards">
+                    <div class="info-card">
+                        <h3>🎯 核心功能</h3>
+                        <ul>
+                            <li>自动监听文件变化</li>
+                            <li>智能防抖机制</li>
+                            <li>自动提交和推送</li>
+                            <li>与 Cursor 完美联动</li>
+                        </ul>
+                    </div>
+                    <div class="info-card">
+                        <h3>💡 使用提示</h3>
+                        <ul>
+                            <li>首次使用需要配置 GitHub Token</li>
+                            <li>选择你的项目目录</li>
+                            <li>点击启动即可开始自动同步</li>
+                            <li>在 Cursor 中编码，代码自动同步</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 配置页面 -->
+            <div class="page" id="page-setup">
+                <div class="page-header">
+                    <h2>⚙️ 配置设置</h2>
+                    <p>配置 GitHub AutoSync 的基本设置</p>
+                </div>
+
+                <div class="setup-form">
+                    <div class="form-group">
+                        <label>📁 项目目录</label>
+                        <div class="input-group">
+                            <input type="text" id="project-dir" placeholder="选择项目目录..." readonly>
+                            <button class="btn btn-outline" id="select-dir-btn">浏览</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🔑 GitHub Token</label>
+                        <div class="input-group">
+                            <input type="password" id="github-token" placeholder="ghp_xxxxxxxxxxxx">
+                            <button class="btn btn-link" id="get-token-btn">获取 Token</button>
+                        </div>
+                        <small>需要 repo 权限，用于推送代码到 GitHub</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🔗 GitHub 仓库地址</label>
+                        <input type="text" id="repo-url" placeholder="https://github.com/username/repo.git">
+                        <small>如果已配置 Git 远程仓库，会自动检测</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>⏱️ 防抖时间（秒）</label>
+                        <input type="number" id="debounce-seconds" value="10" min="5" max="60">
+                        <small>文件变化后等待多少秒再提交，避免频繁提交</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn btn-primary" id="save-config-btn">💾 保存配置</button>
+                        <button class="btn btn-secondary" id="test-connection-btn">🔍 测试连接</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 状态页面 -->
+            <div class="page" id="page-status">
+                <div class="page-header">
+                    <h2>📊 同步状态</h2>
+                </div>
+
+                <div class="status-grid">
+                    <div class="status-card">
+                        <div class="status-icon">🔄</div>
+                        <div class="status-title">同步状态</div>
+                        <div class="status-value" id="status-sync">未启动</div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-icon">📁</div>
+                        <div class="status-title">项目目录</div>
+                        <div class="status-value" id="status-dir">--</div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-icon">🔗</div>
+                        <div class="status-title">远程仓库</div>
+                        <div class="status-value" id="status-repo">--</div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-icon">⏱️</div>
+                        <div class="status-title">防抖时间</div>
+                        <div class="status-value" id="status-debounce">10 秒</div>
+                    </div>
+                </div>
+
+                <div class="cursor-status" id="cursor-status">
+                    <h3>🖱️ Cursor 联动状态</h3>
+                    <div class="cursor-indicator">
+                        <div class="cursor-dot"></div>
+                        <span id="cursor-status-text">检测中...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 日志页面 -->
+            <div class="page" id="page-logs">
+                <div class="page-header">
+                    <h2>📝 同步日志</h2>
+                    <button class="btn btn-small" id="clear-logs-btn">清空日志</button>
+                </div>
+
+                <div class="logs-container">
+                    <div class="logs" id="logs-content">
+                        <div class="log-entry info">
+                            <span class="log-time">--:--:--</span>
+                            <span class="log-message">等待启动同步服务...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
+

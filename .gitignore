@@ -1,0 +1,27 @@
+# 配置文件（包含敏感信息）
+config.json
+*.token
+*.key
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+tmp/
+temp/
+

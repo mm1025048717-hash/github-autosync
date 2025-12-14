@@ -1,0 +1,23 @@
+{
+  "github": {
+    "repository": "https://github.com/username/repo.git",
+    "branch": "main",
+    "token": "ghp_your_token_here"
+  },
+  "sync": {
+    "debounceSeconds": 10,
+    "excludePatterns": [
+      ".git",
+      "node_modules",
+      ".expo",
+      "dist",
+      "web-build",
+      ".env",
+      ".DS_Store",
+      "*.log",
+      "coverage",
+      ".idea",
+      ".vscode"
+    ]
+  }
+}

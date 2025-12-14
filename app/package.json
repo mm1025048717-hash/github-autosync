@@ -1,0 +1,42 @@
+{
+  "name": "github-autosync-app",
+  "version": "1.0.0",
+  "description": "GitHub AutoSync - 聊天式自动同步工具（图形界面版）",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "dev": "electron . --dev"
+  },
+  "keywords": [
+    "github",
+    "autosync",
+    "git",
+    "automation"
+  ],
+  "author": "GitHub AutoSync Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  },
+  "build": {
+    "appId": "com.githubautosync.app",
+    "productName": "GitHub AutoSync",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
+  }
+}
