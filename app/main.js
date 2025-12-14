@@ -239,6 +239,9 @@ function createWindow() {
       <div class="input-group hidden" id="token-group">
         <label class="input-label">GitHub Token</label>
         <input type="password" class="input-field" id="token-input" placeholder="粘贴 Token">
+        <label class="input-label" style="margin-top:12px;">DeepSeek API Key (可选)</label>
+        <input type="password" class="input-field" id="deepseek-input" placeholder="用于 AI 生成 commit message">
+        <small style="font-size:11px;color:#86868B;margin-top:4px;display:block;">留空则使用本地规则生成</small>
       </div>
       <button class="btn btn-primary" id="main-btn" disabled>检测中</button>
       <button class="btn btn-secondary hidden" id="secondary-btn"></button>
@@ -251,7 +254,7 @@ function createWindow() {
     const nodePath = require('path');
     const os = require('os');
     
-    const state = { projectDir: '', token: '', commits: 0, startTime: null, timerInterval: null };
+    const state = { projectDir: '', token: '', deepseekApiKey: '', commits: 0, startTime: null, timerInterval: null };
     const $ = id => document.getElementById(id);
     
     window.onload = () => setTimeout(autoDetect, 300);
@@ -277,8 +280,12 @@ function createWindow() {
       
       await delay(300);
       state.token = loadToken();
+      state.deepseekApiKey = loadDeepSeekKey();
       if (!state.token) { showNeedToken(); return; }
       addActivity('Token 已配置', 'watch');
+      if (state.deepseekApiKey) {
+        addActivity('DeepSeek API 已配置', 'watch');
+      }
       showReady();
     }
     
@@ -308,8 +315,20 @@ function createWindow() {
       return null;
     }
     
+    function loadDeepSeekKey() {
+      try {
+        const p = nodePath.join(os.homedir(), '.autosync-deepseek');
+        if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8').trim();
+      } catch (e) {}
+      return null;
+    }
+    
     function saveToken(token) {
       try { fs.writeFileSync(nodePath.join(os.homedir(), '.autosync-token'), token, 'utf8'); } catch (e) {}
+    }
+    
+    function saveDeepSeekKey(key) {
+      try { fs.writeFileSync(nodePath.join(os.homedir(), '.autosync-deepseek'), key, 'utf8'); } catch (e) {}
     }
     
     async function selectProject() {
@@ -332,6 +351,14 @@ function createWindow() {
       $('token-group').classList.remove('hidden');
       $('secondary-btn').classList.remove('hidden');
       $('secondary-btn').textContent = '获取 Token';
+      
+      // 加载已保存的 DeepSeek API Key
+      const savedKey = loadDeepSeekKey();
+      if (savedKey) {
+        $('deepseek-input').value = savedKey;
+        state.deepseekApiKey = savedKey;
+      }
+      
       $('secondary-btn').onclick = () => {
         shell.openExternal('https://github.com/settings/tokens/new?description=AutoSync&scopes=repo');
         showToast('请在 GitHub 页面生成 Token');
@@ -341,6 +368,15 @@ function createWindow() {
         if (!token || token.length < 20) { showToast('请输入有效的 Token'); return; }
         state.token = token;
         saveToken(token);
+        
+        // 保存 DeepSeek API Key（可选）
+        const deepseekKey = $('deepseek-input').value.trim();
+        if (deepseekKey) {
+          state.deepseekApiKey = deepseekKey;
+          saveDeepSeekKey(deepseekKey);
+          addActivity('DeepSeek API 已配置', 'watch');
+        }
+        
         $('token-group').classList.add('hidden');
         $('secondary-btn').classList.add('hidden');
         addActivity('Token 已保存', 'watch');
@@ -372,7 +408,11 @@ function createWindow() {
       addActivity('开始监听文件变化...', 'watch');
       
       try {
-        const result = await ipcRenderer.invoke('start-sync', { projectDir: state.projectDir, token: state.token });
+        const result = await ipcRenderer.invoke('start-sync', { 
+          projectDir: state.projectDir, 
+          token: state.token,
+          deepseekApiKey: state.deepseekApiKey 
+        });
         if (!result.success && result.message) addActivity('错误: ' + result.message, 'error');
       } catch (e) { addActivity('启动失败: ' + e.message, 'error'); }
       
@@ -520,10 +560,15 @@ ipcMain.handle('start-sync', async (event, config) => {
   if (!fs.existsSync(scriptPath)) scriptPath = path.join(__dirname, '..', 'auto-sync.ps1');
   if (!fs.existsSync(scriptPath)) return { success: false, message: '找不到同步脚本' };
 
-  syncProcess = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
+  const args = ['-ExecutionPolicy', 'Bypass', '-File', scriptPath];
+  if (config.deepseekApiKey) {
+    args.push('-DeepSeekApiKey', config.deepseekApiKey);
+  }
+  
+  syncProcess = spawn('powershell', args, {
     cwd: config.projectDir,
     shell: true,
-    env: { ...process.env, GITHUB_TOKEN: config.token }
+    env: { ...process.env, GITHUB_TOKEN: config.token, DEEPSEEK_API_KEY: config.deepseekApiKey || '' }
   });
 
   syncProcess.stdout.on('data', d => {

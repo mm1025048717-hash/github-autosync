@@ -2,7 +2,8 @@
 param(
     [string]$Token = "",
     [int]$DebounceSeconds = 10,
-    [switch]$Background = $false
+    [switch]$Background = $false,
+    [string]$DeepSeekApiKey = ""
 )
 
 Write-Host "`n==============================" -ForegroundColor Cyan
@@ -20,13 +21,18 @@ if (Test-Path $configPath) {
     try {
         $config = Get-Content $configPath -Raw | ConvertFrom-Json
         if ($config.github.token -and -not $Token) { $Token = $config.github.token }
+        if ($config.deepseek.apiKey -and -not $DeepSeekApiKey) { $DeepSeekApiKey = $config.deepseek.apiKey }
     } catch {}
 } elseif (Test-Path $userConfigPath) {
     try {
         $config = Get-Content $userConfigPath -Raw | ConvertFrom-Json
         if ($config.token -and -not $Token) { $Token = $config.token }
+        if ($config.deepseekApiKey -and -not $DeepSeekApiKey) { $DeepSeekApiKey = $config.deepseekApiKey }
     } catch {}
 }
+
+# 从环境变量读取 DeepSeek API Key
+if (-not $DeepSeekApiKey) { $DeepSeekApiKey = $env:DEEPSEEK_API_KEY }
 
 # Token from env
 if (-not $Token) { $Token = $env:GITHUB_TOKEN }
@@ -94,6 +100,83 @@ function Analyze-Change {
         Deleted = [int]$parts[1]
         IsNew = $false
     }
+}
+
+# 使用 DeepSeek API 生成 Commit Message
+function Generate-CommitMessage-DeepSeek {
+    param([array]$changedFiles)
+    
+    if (-not $DeepSeekApiKey -or $DeepSeekApiKey -eq "") {
+        return $null
+    }
+    
+    try {
+        # 获取 git diff 内容（限制长度）
+        $diff = git diff --cached 2>$null
+        if (-not $diff) {
+            $diff = git diff HEAD 2>$null
+        }
+        
+        if (-not $diff) {
+            return $null
+        }
+        
+        # 限制 diff 长度（避免超出 API 限制）
+        $diffText = $diff -join "`n"
+        if ($diffText.Length -gt 4000) {
+            $diffText = $diffText.Substring(0, 4000) + "..."
+        }
+        
+        # 构建提示词
+        $prompt = @"
+分析以下代码变更，生成一个简洁、有意义的 Git commit message。
+
+要求：
+1. 使用约定式提交格式（feat/fix/refactor/docs/style/test/chore）
+2. 简洁明了，不超过50字
+3. 只返回 commit message，不要其他说明
+
+代码变更：
+$diffText
+"@
+        
+        # 调用 DeepSeek API
+        $body = @{
+            model = "deepseek-chat"
+            messages = @(
+                @{
+                    role = "system"
+                    content = "你是一个专业的 Git commit message 生成助手。只返回 commit message，不要任何解释。"
+                },
+                @{
+                    role = "user"
+                    content = $prompt
+                }
+            )
+            temperature = 0.3
+            max_tokens = 100
+        } | ConvertTo-Json -Depth 10
+        
+        $headers = @{
+            "Content-Type" = "application/json"
+            "Authorization" = "Bearer $DeepSeekApiKey"
+        }
+        
+        $response = Invoke-RestMethod -Uri "https://api.deepseek.com/chat/completions" -Method Post -Body $body -Headers $headers -ErrorAction Stop
+        
+        if ($response.choices -and $response.choices.Count -gt 0) {
+            $message = $response.choices[0].message.content.Trim()
+            # 清理可能的引号
+            $message = $message -replace '^["'']|["'']$', ''
+            Write-Host "[AI] DeepSeek generated commit message" -ForegroundColor Cyan
+            return $message
+        }
+    } catch {
+        Write-Host "[WARN] DeepSeek API failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        return $null
+    }
+    
+    return $null
 }
 
 # 智能生成 Commit Message（增强版）
@@ -394,8 +477,17 @@ function Invoke-Sync {
     
     git add . 2>$null
     
-    # AI 生成有意义的 commit message
-    $msg = Generate-CommitMessage -changedFiles $changedFiles
+    # AI 生成有意义的 commit message（优先使用 DeepSeek API）
+    $msg = $null
+    if ($DeepSeekApiKey) {
+        $msg = Generate-CommitMessage-DeepSeek -changedFiles $changedFiles
+    }
+    
+    # 如果 DeepSeek 失败或未配置，使用本地规则
+    if (-not $msg) {
+        $msg = Generate-CommitMessage -changedFiles $changedFiles
+    }
+    
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $fullMsg = "$msg ($ts)"
     
