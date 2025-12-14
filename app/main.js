@@ -435,7 +435,10 @@ function createWindow() {
         retry: '重试',
         loadingHistory: '正在加载历史记录...',
         noHistoryFound: '未找到历史记录',
-        refreshingHistory: '正在刷新历史记录...'
+        refreshingHistory: '正在刷新历史记录...',
+        syncProcessEnded: '同步进程已结束',
+        historyLoadFailed: '历史记录加载失败',
+        noProjectDir: '未选择项目目录'
       },
       en: {
         headline: { ready: 'Ready to Start', syncing: 'Syncing', stopped: 'Stopped' },
@@ -496,7 +499,10 @@ function createWindow() {
         retry: 'Retry',
         loadingHistory: 'Loading history...',
         noHistoryFound: 'No history found',
-        refreshingHistory: 'Refreshing history...'
+        refreshingHistory: 'Refreshing history...',
+        syncProcessEnded: 'Sync process ended',
+        historyLoadFailed: 'History load failed',
+        noProjectDir: 'No project directory selected'
       }
     };
     
@@ -809,7 +815,7 @@ function createWindow() {
     async function loadHistory() {
       if (!state.projectDir) {
         console.log('[loadHistory] No project directory');
-        $('history-list').innerHTML = '<div class="history-empty">未选择项目目录</div>';
+        $('history-list').innerHTML = '<div class="history-empty">' + t('noProjectDir') + '</div>';
         return;
       }
       
@@ -832,8 +838,11 @@ function createWindow() {
         }
       } catch (e) {
         console.error('[loadHistory] Failed to load history:', e);
-        $('history-list').innerHTML = '<div class="history-empty">加载失败: ' + e.message + '</div>';
-        addActivity('历史记录加载失败: ' + e.message, 'error');
+        const errorMsg = currentLang === 'zh' 
+          ? `加载失败: ${e.message}`
+          : `Load failed: ${e.message}`;
+        $('history-list').innerHTML = '<div class="history-empty">' + errorMsg + '</div>';
+        addActivity(t('historyLoadFailed') + ': ' + e.message, 'error');
       }
     }
     
@@ -979,7 +988,7 @@ function createWindow() {
       addActivity(text.substring(0, 80), type);
     });
     
-    ipcRenderer.on('sync-stopped', () => addActivity('同步进程已结束', 'error'));
+    ipcRenderer.on('sync-stopped', () => addActivity(t('syncProcessEnded'), 'error'));
     
     function showLoading(title, detail) {
       $('indicator').className = 'indicator loading';
