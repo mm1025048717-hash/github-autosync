@@ -167,17 +167,19 @@ GitHub-AutoSync/
 
 配置 DeepSeek API Key 后，工具会使用 AI 分析代码变更，生成更专业的 commit message。
 
-1. 访问 [DeepSeek 开放平台](https://platform.deepseek.com/)
-2. 注册/登录账号
-3. 创建 API Key
-4. 在应用配置界面输入 API Key
+1. 访问 [DeepSeek API Keys](https://platform.deepseek.com/api_keys) 创建 API Key
+2. 查看 [DeepSeek API 文档](https://api-docs.deepseek.com/zh-cn/) 了解详情
+3. 在应用配置界面输入 API Key（格式：`sk-xxxxxxxxxxxx`）
 
 **优势：**
 - ✅ 更智能的 commit message（AI 分析代码语义）
 - ✅ 符合约定式提交规范
 - ✅ 自动识别功能类型和变更规模
+- ✅ 使用 DeepSeek-V3.2 模型，理解代码上下文
 
 **不配置也可以使用**：未配置时会使用本地智能规则生成 commit message。
+
+**API 费用**：DeepSeek API 按使用量计费，生成 commit message 每次调用成本极低（约 $0.0001）。
 
 ## 📝 配置文件（可选）
 
