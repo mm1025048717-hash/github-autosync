@@ -161,6 +161,95 @@ function createWindow() {
     .stat { text-align: center; }
     .stat-value { font-size: 24px; font-weight: 600; }
     .stat-label { font-size: 12px; color: #86868B; margin-top: 2px; }
+    
+    /* 历史记录时间轴 */
+    .history-timeline {
+      width: 100%;
+      margin-top: 24px;
+      background: #F5F5F7;
+      border-radius: 12px;
+      padding: 16px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .history-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #86868B;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+    }
+    .history-item:hover {
+      border-left-color: #007AFF;
+      transform: translateX(2px);
+    }
+    .history-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #007AFF;
+      flex-shrink: 0;
+    }
+    .history-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .history-message {
+      font-size: 13px;
+      font-weight: 500;
+      color: #1D1D1F;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .history-meta {
+      font-size: 11px;
+      color: #86868B;
+      display: flex;
+      gap: 8px;
+    }
+    .history-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .history-btn {
+      padding: 4px 10px;
+      font-size: 11px;
+      border: 1px solid #D2D2D7;
+      border-radius: 6px;
+      background: white;
+      color: #007AFF;
+      cursor: pointer;
+    }
+    .history-btn:hover {
+      background: #007AFF;
+      color: white;
+      border-color: #007AFF;
+    }
+    .history-empty {
+      text-align: center;
+      color: #86868B;
+      font-size: 13px;
+      padding: 20px;
+    }
+    
     .action-area { padding-top: 24px; }
     .btn {
       width: 100%;
@@ -233,6 +322,14 @@ function createWindow() {
           <div class="stat-label">运行时长</div>
         </div>
       </div>
+      
+      <!-- 历史记录时间轴 -->
+      <div class="history-timeline hidden" id="history-timeline">
+        <div class="history-title">提交历史</div>
+        <div class="history-list" id="history-list">
+          <div class="history-empty">暂无历史记录</div>
+        </div>
+      </div>
     </div>
     
     <div class="action-area">
@@ -254,7 +351,7 @@ function createWindow() {
     const nodePath = require('path');
     const os = require('os');
     
-    const state = { projectDir: '', token: '', deepseekApiKey: '', commits: 0, startTime: null, timerInterval: null };
+    const state = { projectDir: '', token: '', deepseekApiKey: '', commits: 0, startTime: null, timerInterval: null, historyInterval: null };
     const $ = id => document.getElementById(id);
     
     window.onload = () => setTimeout(autoDetect, 300);
@@ -299,8 +396,8 @@ function createWindow() {
       const home = os.homedir();
       for (const p of [nodePath.join(home, 'Desktop'), nodePath.join(home, 'Projects')]) {
         if (await isGitRepo(p)) return p;
-      }
-      return null;
+  }
+  return null;
     }
     
     function isGitRepo(dir) {
@@ -403,9 +500,13 @@ function createWindow() {
       $('status-detail').textContent = '修改代码后会自动提交并推送';
       $('activity-log').classList.remove('hidden');
       $('stats-row').classList.remove('hidden');
+      $('history-timeline').classList.remove('hidden');
       setButton('停止', stopSync, true);
       addActivity('同步服务已启动', 'watch');
       addActivity('开始监听文件变化...', 'watch');
+      
+      // 加载历史记录
+      loadHistory();
       
       try {
         const result = await ipcRenderer.invoke('start-sync', { 
@@ -417,20 +518,111 @@ function createWindow() {
       } catch (e) { addActivity('启动失败: ' + e.message, 'error'); }
       
       state.timerInterval = setInterval(updateTimer, 1000);
+      // 定期刷新历史记录
+      state.historyInterval = setInterval(loadHistory, 30000); // 30秒刷新一次
     }
     
     function stopSync() {
       if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; }
+      if (state.historyInterval) { clearInterval(state.historyInterval); state.historyInterval = null; }
       ipcRenderer.invoke('stop-sync');
       addActivity('同步已停止', 'watch');
       $('indicator').className = 'indicator';
       showReady();
     }
     
+    // 加载 Git 历史记录
+    async function loadHistory() {
+      if (!state.projectDir) return;
+      
+      try {
+        const history = await ipcRenderer.invoke('get-git-history', state.projectDir);
+        if (history && history.length > 0) {
+          renderHistory(history);
+        } else {
+          $('history-list').innerHTML = '<div class="history-empty">暂无历史记录</div>';
+        }
+      } catch (e) {
+        console.error('Failed to load history:', e);
+      }
+    }
+    
+    // 渲染历史记录
+    function renderHistory(commits) {
+      const list = $('history-list');
+      list.innerHTML = '';
+      
+      commits.forEach((commit, index) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        
+        const time = new Date(commit.date).toLocaleString('zh-CN', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        item.innerHTML = \`
+          <div class="history-dot"></div>
+          <div class="history-content">
+            <div class="history-message">\${escapeHtml(commit.message)}</div>
+            <div class="history-meta">
+              <span>\${time}</span>
+              <span>•</span>
+              <span>\${commit.hash.substring(0, 7)}</span>
+            </div>
+          </div>
+          <div class="history-actions">
+            <button class="history-btn" onclick="rollbackToCommit('\${commit.hash}')">恢复</button>
+          </div>
+        \`;
+        
+        list.appendChild(item);
+      });
+    }
+    
+    // 回滚到指定版本
+    async function rollbackToCommit(hash) {
+      if (!confirm('确定要恢复到该版本吗？当前未提交的更改可能会丢失。')) {
+        return;
+      }
+      
+      try {
+        addActivity('正在恢复版本: ' + hash.substring(0, 7), 'watch');
+        const result = await ipcRenderer.invoke('rollback-commit', {
+          projectDir: state.projectDir,
+          hash: hash
+        });
+        
+        if (result.success) {
+          addActivity('已恢复到版本: ' + hash.substring(0, 7), 'push');
+          showToast('已恢复到指定版本');
+          // 刷新历史记录
+          setTimeout(loadHistory, 1000);
+      } else {
+          addActivity('恢复失败: ' + result.message, 'error');
+          showToast('恢复失败: ' + result.message);
+        }
+      } catch (e) {
+        addActivity('恢复失败: ' + e.message, 'error');
+        showToast('恢复失败');
+      }
+    }
+    
+    // 全局暴露 rollbackToCommit
+    window.rollbackToCommit = rollbackToCommit;
+    
     function updateTimer() {
       if (!state.startTime) return;
       const secs = Math.floor((Date.now() - state.startTime) / 1000);
       $('stat-time').textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
     
     function addActivity(text, type = 'info') {
@@ -588,6 +780,107 @@ ipcMain.handle('start-sync', async (event, config) => {
 ipcMain.handle('stop-sync', () => {
   if (syncProcess) { syncProcess.kill(); syncProcess = null; }
   return { success: true };
+});
+
+// 获取 Git 历史记录
+ipcMain.handle('get-git-history', async (event, projectDir) => {
+  return new Promise((resolve) => {
+    const gitProcess = spawn('git', ['log', '--pretty=format:%H|%s|%ad', '--date=iso', '-20'], {
+      cwd: projectDir,
+      shell: true
+    });
+    
+    let output = '';
+    gitProcess.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    gitProcess.on('close', (code) => {
+      if (code === 0 && output) {
+        const commits = output.trim().split('\n').map(line => {
+          const [hash, ...messageParts] = line.split('|');
+          const message = messageParts.slice(0, -1).join('|');
+          const date = messageParts[messageParts.length - 1];
+          return {
+            hash: hash,
+            message: message || 'No message',
+            date: date || new Date().toISOString()
+          };
+        });
+        resolve(commits);
+      } else {
+        resolve([]);
+      }
+    });
+    
+    gitProcess.on('error', () => {
+      resolve([]);
+    });
+  });
+});
+
+// 回滚到指定版本
+ipcMain.handle('rollback-commit', async (event, config) => {
+  return new Promise((resolve) => {
+    // 先检查工作区是否干净
+    const statusProcess = spawn('git', ['status', '--porcelain'], {
+      cwd: config.projectDir,
+      shell: true
+    });
+
+    let hasChanges = false;
+    statusProcess.stdout.on('data', (data) => {
+      if (data.toString().trim()) hasChanges = true;
+    });
+    
+    statusProcess.on('close', () => {
+      if (hasChanges) {
+        // 有未提交的更改，先 stash
+        const stashProcess = spawn('git', ['stash', 'push', '-m', 'AutoSync: stash before rollback'], {
+          cwd: config.projectDir,
+          shell: true
+        });
+        
+        stashProcess.on('close', () => {
+          // 执行回滚
+          const checkoutProcess = spawn('git', ['checkout', config.hash], {
+            cwd: config.projectDir,
+            shell: true
+          });
+          
+          checkoutProcess.on('close', (code) => {
+            if (code === 0) {
+              resolve({ success: true, message: '已恢复到指定版本' });
+      } else {
+              resolve({ success: false, message: '回滚失败' });
+            }
+          });
+          
+          checkoutProcess.on('error', (err) => {
+            resolve({ success: false, message: err.message });
+          });
+        });
+      } else {
+        // 直接回滚
+        const checkoutProcess = spawn('git', ['checkout', config.hash], {
+          cwd: config.projectDir,
+          shell: true
+        });
+        
+        checkoutProcess.on('close', (code) => {
+          if (code === 0) {
+            resolve({ success: true, message: '已恢复到指定版本' });
+          } else {
+            resolve({ success: false, message: '回滚失败' });
+          }
+        });
+        
+        checkoutProcess.on('error', (err) => {
+          resolve({ success: false, message: err.message });
+        });
+      }
+    });
+  });
 });
 
 app.whenReady().then(createWindow);

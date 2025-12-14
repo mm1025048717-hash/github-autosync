@@ -6,14 +6,15 @@
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 [![AI Powered](https://img.shields.io/badge/AI-Powered-blue.svg)](https://github.com)
 
-## 🆕 最新更新 (v4.0 - 智能工作流)
+## 🆕 最新更新 (v4.2 - 完整备份方案)
 
-- 🤖 **AI 生成 Commit Message** - 自动分析代码变更，生成有意义的提交信息
-- 🧠 **智能过滤无意义提交** - 自动识别并合并临时文件、格式化等无意义更改
-- 💾 **实时备份** - 每次保存自动备份到 GitHub，代码永不丢失
-- 🔄 **多设备同步** - 一台设备编码，其他设备自动拉取最新代码
-- 📊 **实时活动日志** - 界面实时显示同步活动，随时掌握状态
-- 🎯 **极简设计** - Apple 风格，一键启动，零配置
+- 📱 **多平台支持** - Windows (.exe) + macOS (.dmg) + Linux (AppImage)
+- 📅 **可视化历史记录** - 时间轴展示所有 commit，一目了然
+- ⏪ **一键回滚** - 点击即可恢复到任意历史版本，备份工具的核心功能
+- 🤖 **DeepSeek AI 集成** - 使用 DeepSeek API 生成专业的 commit message
+- 🧠 **智能过滤** - 自动识别并跳过无意义提交
+- 💾 **实时备份** - 每次保存自动备份到 GitHub
+- 🔄 **多设备同步** - 无缝切换设备，自动同步
 
 ## ✨ 项目简介
 
@@ -58,10 +59,21 @@
   - 冲突时提供解决建议
 - **防抖机制** - 避免频繁提交，默认10秒防抖，可自定义
 
+### 📅 可视化历史记录
+- **时间轴视图** - 清晰展示所有 commit 历史
+- **实时更新** - 每次提交自动刷新历史记录
+- **详细信息** - 显示 commit message、时间、hash
+
+### ⏪ 一键回滚
+- **快速恢复** - 点击"恢复"按钮即可回滚到任意版本
+- **智能处理** - 自动处理未提交的更改（stash）
+- **安全确认** - 回滚前提示确认，防止误操作
+
 ### 🎨 极简体验
 - **零配置** - 选择项目文件夹，一键启动
 - **后台运行** - 不影响编码思路，完全静默
 - **精美界面** - Apple 风格设计，简洁优雅
+- **多平台** - Windows、macOS、Linux 全平台支持
 
 ## 🚀 快速开始
 
@@ -74,6 +86,35 @@
 3. 在图形界面中配置并启动
 
 **详细说明：** 查看 [图形界面使用指南](docs/README-图形界面版.md)
+
+### 📦 打包为可执行文件
+
+**Windows:**
+```bash
+cd app
+npm run build
+# 输出：dist/GitHub AutoSync Setup.exe
+```
+
+**macOS:**
+```bash
+cd app
+npm run build -- --mac
+# 输出：dist/GitHub AutoSync.dmg
+```
+
+**Linux:**
+```bash
+cd app
+npm run build -- --linux
+# 输出：dist/GitHub AutoSync.AppImage
+```
+
+**打包所有平台：**
+```bash
+cd app
+npm run build -- --win --mac --linux
+```
 
 ### 方式二：命令行版（推荐高级用户）
 
