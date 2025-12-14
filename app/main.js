@@ -342,7 +342,10 @@ function createWindow() {
       
       <!-- 历史记录时间轴 -->
       <div class="history-timeline hidden" id="history-timeline">
-        <div class="history-title">提交历史</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div class="history-title">提交历史</div>
+          <button class="history-btn" id="refresh-history" style="font-size: 11px; padding: 4px 8px;">刷新</button>
+        </div>
         <div class="history-list" id="history-list">
           <div class="history-empty" id="history-empty">暂无历史记录</div>
         </div>
@@ -760,8 +763,17 @@ function createWindow() {
       addActivity(t('syncStarted'), 'watch');
       addActivity(t('watching'), 'watch');
       
-      // 加载历史记录
-      loadHistory();
+      // 立即加载历史记录
+      setTimeout(() => loadHistory(), 500);
+      
+      // 绑定刷新按钮
+      const refreshBtn = $('refresh-history');
+      if (refreshBtn) {
+        refreshBtn.onclick = () => {
+          addActivity('正在刷新历史记录...', 'watch');
+          loadHistory();
+        };
+      }
       
       try {
         const result = await ipcRenderer.invoke('start-sync', { 
@@ -791,23 +803,28 @@ function createWindow() {
     async function loadHistory() {
       if (!state.projectDir) {
         console.log('[loadHistory] No project directory');
+        $('history-list').innerHTML = '<div class="history-empty">未选择项目目录</div>';
         return;
       }
       
       try {
         console.log('[loadHistory] Loading history from:', state.projectDir);
+        addActivity('正在加载历史记录...', 'watch');
         const history = await ipcRenderer.invoke('get-git-history', state.projectDir);
         console.log('[loadHistory] Received history:', history);
         
         if (history && history.length > 0) {
           renderHistory(history);
+          addActivity(`已加载 ${history.length} 条历史记录`, 'push');
         } else {
           $('history-list').innerHTML = '<div class="history-empty">' + t('noHistory') + '</div>';
           console.log('[loadHistory] No history found');
+          addActivity('未找到历史记录', 'watch');
         }
       } catch (e) {
         console.error('[loadHistory] Failed to load history:', e);
         $('history-list').innerHTML = '<div class="history-empty">加载失败: ' + e.message + '</div>';
+        addActivity('历史记录加载失败: ' + e.message, 'error');
       }
     }
     
