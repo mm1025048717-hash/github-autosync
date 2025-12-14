@@ -294,10 +294,27 @@ function createWindow() {
       from { opacity: 0; transform: translate(-50%, 20px); }
       to { opacity: 1; transform: translate(-50%, 0); }
     }
+    .lang-btn {
+      background: transparent;
+      border: 1px solid #D2D2D7;
+      color: #007AFF;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .lang-btn:hover {
+      background: #F5F5F7;
+      border-color: #007AFF;
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <div style="position: absolute; top: 20px; right: 20px;">
+      <button id="lang-toggle" class="lang-btn" title="Switch Language">中文</button>
+    </div>
     <div class="brand">AutoSync</div>
     <h1 class="headline" id="headline">准备开始</h1>
     <p class="subhead" id="subhead">自动同步代码到 GitHub</p>
@@ -327,7 +344,7 @@ function createWindow() {
       <div class="history-timeline hidden" id="history-timeline">
         <div class="history-title">提交历史</div>
         <div class="history-list" id="history-list">
-          <div class="history-empty">暂无历史记录</div>
+          <div class="history-empty" id="history-empty">暂无历史记录</div>
         </div>
       </div>
     </div>
@@ -354,34 +371,264 @@ function createWindow() {
     const state = { projectDir: '', token: '', deepseekApiKey: '', commits: 0, startTime: null, timerInterval: null, historyInterval: null };
     const $ = id => document.getElementById(id);
     
-    window.onload = () => setTimeout(autoDetect, 300);
+    // 语言包
+    const i18n = {
+      zh: {
+        headline: { ready: '准备开始', syncing: '同步中', stopped: '已停止' },
+        subhead: { ready: '自动同步代码到 GitHub', syncing: '实时监听文件变化', stopped: '同步已停止' },
+        status: { detecting: '检测环境中', running: '运行中', stopped: '已停止' },
+        statusDetail: { detecting: '正在分析开发环境', running: '修改代码后会自动提交并推送', stopped: '点击开始继续同步' },
+        activity: '实时活动',
+        commits: '提交',
+        runtime: '运行时长',
+        history: '提交历史',
+        noHistory: '暂无历史记录',
+        githubToken: 'GitHub Token',
+        deepseekKey: 'DeepSeek API Key (可选)',
+        deepseekPlaceholder: '用于 AI 生成 commit message',
+        deepseekHint: '留空则使用本地规则生成',
+        detecting: '检测中',
+        start: '开始同步',
+        stop: '停止',
+        browse: '浏览',
+        continue: '继续',
+        selectProject: '选择项目目录',
+        selectProjectDesc: '点击下方按钮选择项目目录',
+        rollback: '恢复',
+        restore: '恢复到此版本',
+        confirmRollback: '确定要恢复到该版本吗？当前未提交的更改可能会丢失。',
+        restored: '已恢复到指定版本',
+        restoreFailed: '恢复失败',
+        syncStarted: '同步服务已启动',
+        syncStopped: '同步已停止',
+        watching: '开始监听文件变化...',
+        gitInstalled: 'Git 已安装',
+        tokenConfigured: 'Token 已配置',
+        deepseekConfigured: 'DeepSeek API 已配置',
+        projectSelected: '已选择',
+        tokenSaved: 'Token 已保存',
+        pushed: '已推送到 GitHub',
+        commit: '提交',
+        qualityCheck: '代码质量检测',
+        error: '错误',
+        startupFailed: '启动失败',
+        detectingEnv: '检测环境',
+        analyzingEnv: '正在分析开发环境',
+        noGit: '未安装 Git',
+        installGit: '请先安装 Git',
+        needToken: '需要授权',
+        needTokenDesc: '请输入 GitHub Token 以继续',
+        connectGitHub: '连接 GitHub 账户',
+        enterToken: '输入 Token',
+        tokenPurpose: '用于推送代码到 GitHub',
+        getToken: '获取 Token',
+        generateTokenHint: '请在 GitHub 页面生成 Token',
+        enterValidToken: '请输入有效的 Token',
+        oneClickStart: '一键启动',
+        autoSyncDesc: '保存文件后自动同步到 GitHub',
+        restoring: '正在恢复版本: ',
+        restoredTo: '已恢复到版本: ',
+        pasteToken: '粘贴 Token',
+        retry: '重试'
+      },
+      en: {
+        headline: { ready: 'Ready to Start', syncing: 'Syncing', stopped: 'Stopped' },
+        subhead: { ready: 'Auto-sync code to GitHub', syncing: 'Watching for file changes', stopped: 'Sync stopped' },
+        status: { detecting: 'Detecting', running: 'Running', stopped: 'Stopped' },
+        statusDetail: { detecting: 'Analyzing development environment', running: 'Changes will be auto-committed and pushed', stopped: 'Click start to continue' },
+        activity: 'Real-time Activity',
+        commits: 'Commits',
+        runtime: 'Runtime',
+        history: 'Commit History',
+        noHistory: 'No history yet',
+        githubToken: 'GitHub Token',
+        deepseekKey: 'DeepSeek API Key (Optional)',
+        deepseekPlaceholder: 'For AI-generated commit messages',
+        deepseekHint: 'Leave empty to use local rules',
+        detecting: 'Detecting',
+        start: 'Start Sync',
+        stop: 'Stop',
+        browse: 'Browse',
+        continue: 'Continue',
+        selectProject: 'Select Project Directory',
+        selectProjectDesc: 'Click button below to select project directory',
+        rollback: 'Restore',
+        restore: 'Restore to this version',
+        confirmRollback: 'Are you sure? Uncommitted changes may be lost.',
+        restored: 'Restored to version',
+        restoreFailed: 'Restore failed',
+        syncStarted: 'Sync service started',
+        syncStopped: 'Sync stopped',
+        watching: 'Watching for file changes...',
+        gitInstalled: 'Git installed',
+        tokenConfigured: 'Token configured',
+        deepseekConfigured: 'DeepSeek API configured',
+        projectSelected: 'Selected',
+        tokenSaved: 'Token saved',
+        pushed: 'Pushed to GitHub',
+        commit: 'Commit',
+        qualityCheck: 'Code quality check',
+        error: 'Error',
+        startupFailed: 'Startup failed',
+        detectingEnv: 'Detecting',
+        analyzingEnv: 'Analyzing development environment',
+        noGit: 'Git not installed',
+        installGit: 'Please install Git first',
+        needToken: 'Authorization Required',
+        needTokenDesc: 'Please enter GitHub Token to continue',
+        connectGitHub: 'Connect GitHub account',
+        enterToken: 'Enter Token',
+        tokenPurpose: 'To push code to GitHub',
+        getToken: 'Get Token',
+        generateTokenHint: 'Please generate Token on GitHub',
+        enterValidToken: 'Please enter a valid Token',
+        oneClickStart: 'Ready to Start',
+        autoSyncDesc: 'Auto-sync to GitHub after saving files',
+        restoring: 'Restoring version: ',
+        restoredTo: 'Restored to version: ',
+        pasteToken: 'Paste Token',
+        retry: 'Retry'
+      }
+    };
+    
+    // 当前语言
+    let currentLang = 'zh';
+    
+    // 加载保存的语言偏好
+    function loadLanguage() {
+      try {
+        const langFile = nodePath.join(os.homedir(), '.autosync-lang');
+        if (fs.existsSync(langFile)) {
+          currentLang = fs.readFileSync(langFile, 'utf8').trim() || 'zh';
+        }
+      } catch (e) {}
+      return currentLang;
+    }
+    
+    // 保存语言偏好
+    function saveLanguage(lang) {
+      try {
+        const langFile = nodePath.join(os.homedir(), '.autosync-lang');
+        fs.writeFileSync(langFile, lang, 'utf8');
+      } catch (e) {}
+    }
+    
+    // 切换语言
+    function switchLanguage() {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      saveLanguage(currentLang);
+      updateUI();
+      $('lang-toggle').textContent = currentLang === 'zh' ? 'English' : '中文';
+    }
+    
+    // 获取文本
+    function t(key, subKey = null) {
+      const text = subKey ? i18n[currentLang][key]?.[subKey] : i18n[currentLang][key];
+      return text || key;
+    }
+    
+    // 更新 UI 文本
+    function updateUI() {
+      const lang = i18n[currentLang];
+      const state = getUIState();
+      
+      if (state === 'ready') {
+        $('headline').textContent = lang.headline.ready;
+        $('subhead').textContent = lang.subhead.ready;
+        $('status-text').textContent = lang.status.detecting;
+        $('status-detail').textContent = lang.statusDetail.detecting;
+      } else if (state === 'syncing') {
+        $('headline').textContent = lang.headline.syncing;
+        $('subhead').textContent = lang.subhead.syncing;
+        $('status-text').textContent = lang.status.running;
+        $('status-detail').textContent = lang.statusDetail.running;
+      } else {
+        $('headline').textContent = lang.headline.stopped;
+        $('subhead').textContent = lang.subhead.stopped;
+        $('status-text').textContent = lang.status.stopped;
+        $('status-detail').textContent = lang.statusDetail.stopped;
+      }
+      
+      const activityTitle = document.querySelector('.activity-title');
+      if (activityTitle) activityTitle.textContent = lang.activity;
+      
+      const statLabels = document.querySelectorAll('.stat-label');
+      if (statLabels.length >= 2) {
+        statLabels[0].textContent = lang.commits;
+        statLabels[1].textContent = lang.runtime;
+      }
+      
+      const historyTitle = document.querySelector('.history-title');
+      if (historyTitle) historyTitle.textContent = lang.history;
+      
+      // 更新历史记录中的"恢复"按钮
+      const restoreButtons = document.querySelectorAll('.history-btn');
+      restoreButtons.forEach(btn => {
+        btn.textContent = lang.rollback;
+      });
+      
+      const tokenLabel = document.querySelector('#token-group label');
+      if (tokenLabel) {
+        tokenLabel.textContent = lang.githubToken;
+        const deepseekLabel = tokenLabel.nextElementSibling.nextElementSibling;
+        if (deepseekLabel && deepseekLabel.tagName === 'LABEL') deepseekLabel.textContent = lang.deepseekKey;
+        const deepseekInput = $('deepseek-input');
+        if (deepseekInput) deepseekInput.placeholder = lang.deepseekPlaceholder;
+        const hint = document.querySelector('#token-group small');
+        if (hint) hint.textContent = lang.deepseekHint;
+      }
+      
+      // 如果历史记录已加载，重新渲染以更新语言
+      if (state.projectDir) {
+        loadHistory();
+      }
+    }
+    
+    // 获取当前 UI 状态
+    function getUIState() {
+      if ($('indicator').classList.contains('active')) return 'syncing';
+      if ($('indicator').classList.contains('loading')) return 'ready';
+      return 'stopped';
+    }
+    
+    // 初始化语言
+    currentLang = loadLanguage();
+    if ($('lang-toggle')) {
+      $('lang-toggle').textContent = currentLang === 'zh' ? 'English' : '中文';
+      $('lang-toggle').onclick = switchLanguage;
+    }
+    
+    window.onload = () => {
+      setTimeout(autoDetect, 300);
+      updateUI();
+    };
     
     async function autoDetect() {
-      showLoading('检测环境', '正在分析开发环境');
+      showLoading(t('detectingEnv'), t('analyzingEnv'));
       await delay(400);
       
       const hasGit = await checkGit();
-      if (!hasGit) { showError('未安装 Git', '请先安装 Git'); return; }
-      addActivity('Git 已安装', 'watch');
+      if (!hasGit) { showError(t('noGit'), t('installGit')); return; }
+      addActivity(t('gitInstalled'), 'watch');
       
       await delay(300);
       state.projectDir = await detectProject();
       if (!state.projectDir) {
-        $('status-text').textContent = '选择项目';
-        $('status-detail').textContent = '点击下方按钮选择项目目录';
+        $('status-text').textContent = t('selectProject');
+        $('status-detail').textContent = t('selectProjectDesc');
         $('indicator').className = 'indicator';
-        setButton('选择项目目录', selectProject);
+        setButton(t('selectProject'), selectProject);
         return;
       }
-      addActivity('项目: ' + shortenPath(state.projectDir), 'watch');
+      addActivity(t('projectSelected') + ': ' + shortenPath(state.projectDir), 'watch');
       
       await delay(300);
       state.token = loadToken();
       state.deepseekApiKey = loadDeepSeekKey();
       if (!state.token) { showNeedToken(); return; }
-      addActivity('Token 已配置', 'watch');
+      addActivity(t('tokenConfigured'), 'watch');
       if (state.deepseekApiKey) {
-        addActivity('DeepSeek API 已配置', 'watch');
+        addActivity(t('deepseekConfigured'), 'watch');
       }
       showReady();
     }
@@ -432,7 +679,7 @@ function createWindow() {
       const dir = await ipcRenderer.invoke('select-directory');
       if (dir) {
         state.projectDir = dir;
-        addActivity('已选择: ' + shortenPath(dir), 'watch');
+        addActivity(t('projectSelected') + ': ' + shortenPath(dir), 'watch');
         await delay(300);
         state.token = loadToken();
         state.token ? showReady() : showNeedToken();
@@ -440,14 +687,18 @@ function createWindow() {
     }
     
     function showNeedToken() {
-      $('headline').textContent = '需要授权';
-      $('subhead').textContent = '连接 GitHub 账户';
+      $('headline').textContent = t('needToken');
+      $('subhead').textContent = t('connectGitHub');
       $('indicator').className = 'indicator';
-      $('status-text').textContent = '输入 Token';
-      $('status-detail').textContent = '用于推送代码到 GitHub';
+      $('status-text').textContent = t('enterToken');
+      $('status-detail').textContent = t('tokenPurpose');
       $('token-group').classList.remove('hidden');
       $('secondary-btn').classList.remove('hidden');
-      $('secondary-btn').textContent = '获取 Token';
+      $('secondary-btn').textContent = t('getToken');
+      
+      // 更新输入框 placeholder
+      const tokenInput = $('token-input');
+      if (tokenInput) tokenInput.placeholder = t('pasteToken');
       
       // 加载已保存的 DeepSeek API Key
       const savedKey = loadDeepSeekKey();
@@ -458,11 +709,14 @@ function createWindow() {
       
       $('secondary-btn').onclick = () => {
         shell.openExternal('https://github.com/settings/tokens/new?description=AutoSync&scopes=repo');
-        showToast('请在 GitHub 页面生成 Token');
+        showToast(t('generateTokenHint'));
       };
-      setButton('继续', () => {
+      setButton(t('continue'), () => {
         const token = $('token-input').value.trim();
-        if (!token || token.length < 20) { showToast('请输入有效的 Token'); return; }
+        if (!token || token.length < 20) { 
+          showToast(t('enterValidToken')); 
+          return; 
+        }
         state.token = token;
         saveToken(token);
         
@@ -471,39 +725,40 @@ function createWindow() {
         if (deepseekKey) {
           state.deepseekApiKey = deepseekKey;
           saveDeepSeekKey(deepseekKey);
-          addActivity('DeepSeek API 已配置', 'watch');
+          addActivity(t('deepseekConfigured'), 'watch');
         }
         
         $('token-group').classList.add('hidden');
         $('secondary-btn').classList.add('hidden');
-        addActivity('Token 已保存', 'watch');
+        addActivity(t('tokenSaved'), 'watch');
         showReady();
       });
     }
     
     function showReady() {
-      $('headline').textContent = '准备就绪';
+      $('headline').textContent = t('headline', 'ready');
       $('subhead').textContent = shortenPath(state.projectDir);
       $('indicator').className = 'indicator';
-      $('status-text').textContent = '一键启动';
-      $('status-detail').textContent = '保存文件后自动同步到 GitHub';
-      setButton('开始同步', startSync);
+      $('status-text').textContent = t('oneClickStart');
+      $('status-detail').textContent = t('autoSyncDesc');
+      setButton(t('start'), startSync);
+      updateUI();
     }
     
     async function startSync() {
       state.startTime = Date.now();
       state.commits = 0;
-      $('headline').textContent = '同步中';
-      $('subhead').textContent = '实时监听文件变化';
+      $('headline').textContent = t('headline', 'syncing');
+      $('subhead').textContent = t('subhead', 'syncing');
       $('indicator').className = 'indicator active';
-      $('status-text').textContent = '运行中';
-      $('status-detail').textContent = '修改代码后会自动提交并推送';
+      $('status-text').textContent = t('status', 'running');
+      $('status-detail').textContent = t('statusDetail', 'running');
       $('activity-log').classList.remove('hidden');
       $('stats-row').classList.remove('hidden');
       $('history-timeline').classList.remove('hidden');
-      setButton('停止', stopSync, true);
-      addActivity('同步服务已启动', 'watch');
-      addActivity('开始监听文件变化...', 'watch');
+      setButton(t('stop'), stopSync, true);
+      addActivity(t('syncStarted'), 'watch');
+      addActivity(t('watching'), 'watch');
       
       // 加载历史记录
       loadHistory();
@@ -514,19 +769,20 @@ function createWindow() {
           token: state.token,
           deepseekApiKey: state.deepseekApiKey 
         });
-        if (!result.success && result.message) addActivity('错误: ' + result.message, 'error');
-      } catch (e) { addActivity('启动失败: ' + e.message, 'error'); }
+        if (!result.success && result.message) addActivity(t('error') + ': ' + result.message, 'error');
+      } catch (e) { addActivity(t('startupFailed') + ': ' + e.message, 'error'); }
       
       state.timerInterval = setInterval(updateTimer, 1000);
       // 定期刷新历史记录
       state.historyInterval = setInterval(loadHistory, 30000); // 30秒刷新一次
+      updateUI();
     }
     
     function stopSync() {
       if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; }
       if (state.historyInterval) { clearInterval(state.historyInterval); state.historyInterval = null; }
       ipcRenderer.invoke('stop-sync');
-      addActivity('同步已停止', 'watch');
+      addActivity(t('syncStopped'), 'watch');
       $('indicator').className = 'indicator';
       showReady();
     }
@@ -540,7 +796,7 @@ function createWindow() {
         if (history && history.length > 0) {
           renderHistory(history);
         } else {
-          $('history-list').innerHTML = '<div class="history-empty">暂无历史记录</div>';
+          $('history-list').innerHTML = '<div class="history-empty">' + t('noHistory') + '</div>';
         }
       } catch (e) {
         console.error('Failed to load history:', e);
@@ -556,7 +812,8 @@ function createWindow() {
         const item = document.createElement('div');
         item.className = 'history-item';
         
-        const time = new Date(commit.date).toLocaleString('zh-CN', {
+        const locale = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+        const time = new Date(commit.date).toLocaleString(locale, {
           month: 'short',
           day: 'numeric',
           hour: '2-digit',
@@ -574,7 +831,7 @@ function createWindow() {
             </div>
           </div>
           <div class="history-actions">
-            <button class="history-btn" onclick="rollbackToCommit('\${commit.hash}')">恢复</button>
+            <button class="history-btn" onclick="rollbackToCommit('\${commit.hash}')">\${t('rollback')}</button>
           </div>
         \`;
         
@@ -584,29 +841,29 @@ function createWindow() {
     
     // 回滚到指定版本
     async function rollbackToCommit(hash) {
-      if (!confirm('确定要恢复到该版本吗？当前未提交的更改可能会丢失。')) {
+      if (!confirm(t('confirmRollback'))) {
         return;
       }
       
       try {
-        addActivity('正在恢复版本: ' + hash.substring(0, 7), 'watch');
+        addActivity(t('restoring') + hash.substring(0, 7), 'watch');
         const result = await ipcRenderer.invoke('rollback-commit', {
           projectDir: state.projectDir,
           hash: hash
         });
         
         if (result.success) {
-          addActivity('已恢复到版本: ' + hash.substring(0, 7), 'push');
-          showToast('已恢复到指定版本');
+          addActivity(t('restoredTo') + hash.substring(0, 7), 'push');
+          showToast(t('restored'));
           // 刷新历史记录
           setTimeout(loadHistory, 1000);
       } else {
-          addActivity('恢复失败: ' + result.message, 'error');
-          showToast('恢复失败: ' + result.message);
+          addActivity(t('restoreFailed') + ': ' + result.message, 'error');
+          showToast(t('restoreFailed') + ': ' + result.message);
         }
       } catch (e) {
-        addActivity('恢复失败: ' + e.message, 'error');
-        showToast('恢复失败');
+        addActivity(t('restoreFailed') + ': ' + e.message, 'error');
+        showToast(t('restoreFailed'));
       }
     }
     
@@ -627,7 +884,8 @@ function createWindow() {
     
     function addActivity(text, type = 'info') {
       const list = $('activity-list');
-      const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const locale = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+      const time = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const item = document.createElement('div');
       item.className = 'activity-item';
       const dot = document.createElement('div');
@@ -655,20 +913,20 @@ function createWindow() {
         type = 'push';
         state.commits++;
         $('stat-commits').textContent = state.commits;
-        showToast('已推送到 GitHub');
+        showToast(t('pushed'));
       }
       else if (text.includes('[COMMIT]') || text.includes('Commit')) {
         type = 'push';
         // 提取 commit message 显示
         const msgMatch = text.match(/\[COMMIT\]\s*(.+)/);
         if (msgMatch) {
-          addActivity('提交: ' + msgMatch[1].substring(0, 60), type);
+          addActivity(t('commit') + ': ' + msgMatch[1].substring(0, 60), type);
           return;
         }
       }
       else if (text.includes('[QUALITY]') || text.includes('quality warning')) {
         type = 'error';
-        addActivity('代码质量检测: ' + text.substring(0, 70), type);
+        addActivity(t('qualityCheck') + ': ' + text.substring(0, 70), type);
         return;
       }
       else if (text.includes('[WARN]') || text.includes('Conflict') || text.includes('conflict')) {
@@ -694,7 +952,7 @@ function createWindow() {
       $('status-text').textContent = title;
       $('status-detail').textContent = detail;
       $('main-btn').disabled = true;
-      $('main-btn').textContent = '检测中';
+      $('main-btn').textContent = t('detecting');
     }
     
     function showError(title, detail) {
@@ -702,7 +960,7 @@ function createWindow() {
       $('indicator').style.background = '#FF3B30';
       $('status-text').textContent = title;
       $('status-detail').textContent = detail;
-      setButton('重试', autoDetect);
+      setButton(t('retry'), autoDetect);
     }
     
     function setButton(text, onClick, isDanger = false) {
