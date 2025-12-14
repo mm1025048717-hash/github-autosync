@@ -4,6 +4,14 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
+[![AI Powered](https://img.shields.io/badge/AI-Powered-blue.svg)](https://github.com)
+
+## 🆕 最新更新 (v2.0)
+
+- 🤖 **AI 智能助手** - 内置本地 AI，引导你完成配置，智能回答问题
+- 🎨 **全新 UI 设计** - 苹果风格蓝白配色，卡片式布局
+- 📁 **原生目录选择** - 使用系统对话框选择目录，更直观
+- 💬 **智能对话** - AI 自动引导每一步操作，无需查看文档
 
 ## ✨ 项目简介
 
@@ -13,15 +21,16 @@
 
 ## 🎯 核心特点
 
+- 🤖 **AI 智能助手** - 内置 AI 引导，智能回答问题，生成 commit 信息
 - 🚀 **零配置启动** - 一键启动，自动配置，开箱即用
-- 🖥️ **图形界面版** - 精美的 Electron 应用，苹果质感设计，可视化操作
+- 🖥️ **图形界面版** - 精美的 Electron 应用，苹果质感蓝白设计
 - 💻 **命令行版** - 轻量级 PowerShell 脚本，适合高级用户
 - ⚡ **实时监听** - 自动监听项目文件变化，即时响应
 - ⏱️ **智能防抖** - 避免频繁提交，默认10秒防抖，可自定义
 - 🔒 **安全认证** - 使用 GitHub Personal Access Token，安全可靠
 - 🎯 **Cursor 联动** - 自动检测 Cursor 编辑器，完美集成
 - 📦 **智能排除** - 自动排除 `node_modules`、`.git` 等不需要的目录
-- 🎨 **友好界面** - 彩色输出，实时反馈，状态一目了然
+- 🎨 **苹果设计** - 蓝白配色，卡片式布局，极简界面
 
 ## 🚀 快速开始
 
