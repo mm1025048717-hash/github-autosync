@@ -197,18 +197,24 @@ ipcMain.handle('start-sync', async (event, config) => {
     let output = '';
     syncProcess.stdout.on('data', (data) => {
       output += data.toString();
-      // 发送实时日志到渲染进程
-      mainWindow.webContents.send('sync-log', data.toString());
+      // 发送实时日志到渲染进程（添加空检查）
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('sync-log', data.toString());
+      }
     });
 
     syncProcess.stderr.on('data', (data) => {
       output += data.toString();
-      mainWindow.webContents.send('sync-log', data.toString());
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('sync-log', data.toString());
+      }
     });
 
     syncProcess.on('close', (code) => {
       syncProcess = null;
-      mainWindow.webContents.send('sync-stopped', code);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('sync-stopped', code);
+      }
     });
 
     syncProcess.on('error', (error) => {
