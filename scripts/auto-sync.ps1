@@ -67,6 +67,102 @@ $script:pendingChanges = $false
 $script:lastChange = $null
 $script:commits = 0
 
+# 智能生成 Commit Message
+function Generate-CommitMessage {
+    param([array]$changedFiles)
+    
+    # 分析文件类型和变更
+    $fileTypes = @{}
+    $fileCount = 0
+    $hasCode = $false
+    $hasConfig = $false
+    $hasDoc = $false
+    
+    foreach ($file in $changedFiles) {
+        $fileCount++
+        $ext = [System.IO.Path]::GetExtension($file).ToLower()
+        
+        # 判断文件类型
+        if ($ext -in @('.js', '.ts', '.py', '.java', '.cpp', '.cs', '.go', '.rs')) {
+            $hasCode = $true
+            $fileTypes['code'] = ($fileTypes['code'] ?? 0) + 1
+        }
+        elseif ($ext -in @('.json', '.yaml', '.yml', '.toml', '.ini', '.conf')) {
+            $hasConfig = $true
+            $fileTypes['config'] = ($fileTypes['config'] ?? 0) + 1
+        }
+        elseif ($ext -in @('.md', '.txt', '.rst')) {
+            $hasDoc = $true
+            $fileTypes['doc'] = ($fileTypes['doc'] ?? 0) + 1
+        }
+        elseif ($ext -in @('.css', '.scss', '.less')) {
+            $fileTypes['style'] = ($fileTypes['style'] ?? 0) + 1
+        }
+        elseif ($ext -in @('.html', '.vue', '.jsx', '.tsx')) {
+            $fileTypes['ui'] = ($fileTypes['ui'] ?? 0) + 1
+        }
+    }
+    
+    # 生成有意义的 commit message
+    $msg = ""
+    if ($hasCode) {
+        if ($fileCount -eq 1) {
+            $fileName = [System.IO.Path]::GetFileName($changedFiles[0])
+            $msg = "feat: update $fileName"
+        } else {
+            $msg = "feat: update $fileCount files"
+        }
+    }
+    elseif ($hasConfig) {
+        $msg = "config: update configuration files"
+    }
+    elseif ($hasDoc) {
+        $msg = "docs: update documentation"
+    }
+    elseif ($fileTypes.ContainsKey('style')) {
+        $msg = "style: update styles"
+    }
+    elseif ($fileTypes.ContainsKey('ui')) {
+        $msg = "ui: update interface"
+    }
+    else {
+        $msg = "chore: update $fileCount files"
+    }
+    
+    return $msg
+}
+
+# 智能过滤无意义提交
+function Should-SkipCommit {
+    param([array]$changedFiles)
+    
+    # 检查是否只是临时文件或格式化
+    $tempPatterns = @('*.tmp', '*.log', '*.cache', '.DS_Store', 'Thumbs.db')
+    $allTemp = $true
+    
+    foreach ($file in $changedFiles) {
+        $isTemp = $false
+        foreach ($pattern in $tempPatterns) {
+            if ($file -like $pattern) {
+                $isTemp = $true
+                break
+            }
+        }
+        if (-not $isTemp) {
+            $allTemp = $false
+            break
+        }
+    }
+    
+    # 如果全是临时文件，跳过
+    if ($allTemp) {
+        return $true
+    }
+    
+    # 检查是否只是空白字符变化（需要git diff，这里简化处理）
+    return $false
+}
+
 function Invoke-Sync {
     param([string]$reason = "File change")
     
@@ -76,17 +172,35 @@ function Invoke-Sync {
         return
     }
     
+    # 解析变更的文件列表
+    $changedFiles = @()
+    $status | ForEach-Object {
+        $parts = $_ -split '\s+', 2
+        if ($parts.Length -ge 2) {
+            $changedFiles += $parts[1]
+        }
+    }
+    
+    # 智能过滤
+    if (Should-SkipCommit -changedFiles $changedFiles) {
+        Write-Host "[SKIP] Skipping meaningless changes" -ForegroundColor Yellow
+        git reset 2>$null
+        return
+    }
+    
     Write-Host "[CHANGE] Files modified:" -ForegroundColor Cyan
     $status | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
     
     git add . 2>$null
     
+    # AI 生成有意义的 commit message
+    $msg = Generate-CommitMessage -changedFiles $changedFiles
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $msg = "Auto-sync: $ts"
+    $fullMsg = "$msg ($ts)"
     
-    $commitOut = git commit -m $msg 2>&1
+    $commitOut = git commit -m $fullMsg 2>&1
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "[COMMIT] $msg" -ForegroundColor Green
+        Write-Host "[COMMIT] $fullMsg" -ForegroundColor Green
         
         Write-Host "[PUSH] Pushing to GitHub..." -ForegroundColor Yellow
         $branch = "main"
